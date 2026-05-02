@@ -2,51 +2,51 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore, collection, addDoc, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { auth, db, provider } from './config.js'; // Vẫn giữ config của bạn
+import { auth, db, provider } from './config.js'; 
 
-// --- CẤU HÌNH CƠ BẢN ---
 const allowedTeacherEmails = ['nguyentinh52009@gmail.com', 'nguyentinh011009@gmail.com', 'tomizy09icloud@gmail.com'];
 const pageType = document.body.getAttribute('data-page');
 
+// --- BIẾN TOÀN CỤC LƯU DỮ LIỆU ---
+let allExams = []; // Mảng chứa toàn bộ đề thi để dùng cho việc Xuất PDF và Cài đặt
+
 // --- CÁC NÚT ĐĂNG NHẬP/ĐĂNG XUẤT ---
 const btnLogin = document.getElementById('btnLogin');
-const btnLogout = document.getElementById('btnLogout'); // Của học sinh
-const btnSidebarLogout = document.getElementById('btnSidebarLogout'); // Của giáo viên
+const btnLogout = document.getElementById('btnLogout'); 
+const btnSidebarLogout = document.getElementById('btnSidebarLogout'); 
 
 if (btnLogin) btnLogin.addEventListener('click', () => signInWithPopup(auth, provider));
 if (btnLogout) btnLogout.addEventListener('click', () => signOut(auth));
 if (btnSidebarLogout) btnSidebarLogout.addEventListener('click', () => signOut(auth));
 
 // ==========================================
-// 1. KIỂM TRA TRẠNG THÁI ĐĂNG NHẬP (CHẠY CHO CẢ 2 TRANG)
+// 1. KIỂM TRA ĐĂNG NHẬP (CHẠY CHO CẢ 2 TRANG)
 // ==========================================
 onAuthStateChanged(auth, (user) => {
     const loginSection = document.getElementById('login-section');
     const appSection = document.getElementById('app-section');
 
     if (user) {
-        // NẾU LÀ TRANG GIÁO VIÊN
         if (pageType === 'teacher') {
             if (allowedTeacherEmails.includes(user.email)) {
                 if (loginSection) loginSection.classList.add('hidden');
                 if (appSection) appSection.classList.remove('hidden');
                 document.getElementById('userEmail').innerText = "Giáo viên: " + user.email;
                 
-                // GỌI HÀM REAL-TIME ĐỂ TẢI DANH SÁCH HỌC SINH
+                // GỌI HÀM LẤY DỮ LIỆU REAL-TIME
                 loadStudentsRealtime(); 
+                loadExamsRealtime(); // <-- ĐÂY LÀ HÀM SẼ ĐỔ DỮ LIỆU VÀO TAB 2 VÀ TAB 3
             } else {
                 alert("Bạn không có quyền truy cập trang Giáo viên!");
                 signOut(auth);
             }
         } 
-        // NẾU LÀ TRANG HỌC SINH
         else if (pageType === 'student') {
             if (loginSection) loginSection.classList.add('hidden');
             if (appSection) appSection.classList.remove('hidden');
             document.getElementById('studentName').innerText = "Xin chào, " + user.displayName;
         }
     } else {
-        // CHƯA ĐĂNG NHẬP HOẶC ĐÃ ĐĂNG XUẤT
         if (loginSection) loginSection.classList.remove('hidden');
         if (appSection) appSection.classList.add('hidden');
     }
@@ -78,7 +78,7 @@ if (pageType === 'teacher') {
         });
     }
 
-    // C. THÊM PHẦN (SECTIONS)
+    // C. THÊM PHẦN (SECTIONS) TAB 1
     let sectionCount = 0;
     const btnAddSection = document.getElementById('btnAddSection');
     if (btnAddSection) {
@@ -101,7 +101,7 @@ if (pageType === 'teacher') {
         });
     }
 
-    // D. HÀM CẮT ĐỀ (PARSER)
+    // D. HÀM CẮT ĐỀ (PARSER) TAB 1
     function parseExamText(rawText, type) {
         let questions = [];
         let blocks = rawText.split(/(?:Câu|Question)\s+\d+\s*:/i).filter(b => b.trim().length > 0);
@@ -136,13 +136,14 @@ if (pageType === 'teacher') {
         return questions;
     }
 
-    // E. LƯU ĐỀ THI LÊN FIREBASE
+    // E. LƯU ĐỀ THI LÊN FIREBASE (TAB 1)
     const btnSaveExam = document.getElementById('btnSaveExam');
     if (btnSaveExam) {
         btnSaveExam.addEventListener('click', async () => {
             const subject = document.getElementById('subject').value === 'Khác' 
-                            ? document.getElementById('otherSubject').value 
-                            : 'Tiếng Anh';
+                            ? document.getElementById('otherSubject').value : 'Tiếng Anh';
+            const examName = document.getElementById('examName').value;
+            if(!examName) return alert("Vui lòng nhập tên đề thi!");
 
             const sectionsData = Array.from(document.querySelectorAll('.section-item')).map(item => {
                 const raw = item.querySelector('.raw-text').value;
@@ -157,16 +158,15 @@ if (pageType === 'teacher') {
             const examData = {
                 subject: subject,
                 grade: document.getElementById('grade').value,
-                name: document.getElementById('examName').value,
+                name: examName,
                 type: document.getElementById('examType').value,
-                createdAt: new Date(),
+                createdAt: new Date().toISOString(),
                 sections: sectionsData
             };
 
             try {
                 await addDoc(collection(db, "exams"), examData);
-                alert("Lưu đề thành công!");
-                // Clear form
+                alert("Lưu đề thành công! Hãy sang Tab Cài đặt để quản lý.");
                 document.getElementById('examName').value = "";
                 document.getElementById('sections-container').innerHTML = "";
                 sectionCount = 0;
@@ -176,7 +176,100 @@ if (pageType === 'teacher') {
         });
     }
 
-    // F. THÊM HỌC SINH VÀ TẢI DANH SÁCH REAL-TIME
+    // ==========================================
+    // F. HÀM TẢI DANH SÁCH ĐỀ THI CHO TAB 2 & 3
+    // ==========================================
+    function loadExamsRealtime() {
+        onSnapshot(collection(db, "exams"), (snapshot) => {
+            const selectSetting = document.getElementById('selectExamSetting');
+            const selectManage = document.getElementById('selectExamManage');
+            
+            if(!selectSetting || !selectManage) return;
+
+            // Xóa danh sách cũ
+            selectSetting.innerHTML = '<option value="">-- Chọn đề thi --</option>';
+            selectManage.innerHTML = '<option value="">-- Chọn đề thi --</option>';
+            allExams = []; // Reset mảng toàn cục
+
+            snapshot.forEach((doc) => {
+                let data = doc.data();
+                allExams.push({ id: doc.id, ...data }); // Lưu vào mảng để dùng cho việc in PDF
+
+                let examName = data.name || "Đề không tên";
+                let optionHTML = `<option value="${doc.id}">[Khối ${data.grade}] ${examName} - ${data.subject}</option>`;
+                
+                selectSetting.innerHTML += optionHTML;
+                selectManage.innerHTML += optionHTML;
+            });
+        }, (error) => {
+            console.error("Lỗi tải đề thi: ", error);
+        });
+    }
+
+    // ==========================================
+    // G. TÍNH NĂNG XUẤT ĐỀ THI RA FILE PDF (TAB 2)
+    // ==========================================
+    const btnExportPDF = document.getElementById('btnExportPDF');
+    if (btnExportPDF) {
+        btnExportPDF.addEventListener('click', () => {
+            const examId = document.getElementById('selectExamSetting').value;
+            if (!examId) return alert("Vui lòng chọn 1 đề thi ở danh sách bên trên để xuất PDF!");
+
+            // Tìm đề thi trong mảng đã tải
+            const exam = allExams.find(e => e.id === examId);
+            if(!exam) return alert("Không tìm thấy dữ liệu đề thi!");
+
+            // 1. Tạo chuỗi HTML chứa cấu trúc đề thi
+            let htmlContent = `
+                <div style="padding: 20px; font-family: 'Times New Roman', serif; color: black; line-height: 1.5;">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <h2 style="margin: 0; font-size: 20px;">HỆ THỐNG ÔN TẬP FUEDU</h2>
+                        <h1 style="margin: 5px 0; font-size: 22px; text-transform: uppercase;">${exam.name}</h1>
+                        <p style="margin: 0; font-style: italic;">Môn: ${exam.subject} - Khối: ${exam.grade}</p>
+                        <p style="margin: 0; font-style: italic;">Loại: ${exam.type}</p>
+                    </div>
+                    <hr style="border: 1px solid black; margin-bottom: 20px;">
+            `;
+
+            exam.sections.forEach(sec => {
+                htmlContent += `<h3 style="font-size: 18px; margin-top: 15px; text-transform: uppercase;">${sec.name}</h3>`;
+                sec.questions.forEach(q => {
+                    htmlContent += `<div style="margin-bottom: 10px;">
+                        <span style="font-weight: bold;">Câu ${q.id}:</span> ${q.content}
+                        <div style="margin-top: 5px; padding-left: 15px;">`;
+                    
+                    if (q.options && q.options.length > 0) {
+                        q.options.forEach((opt, idx) => {
+                            let char = String.fromCharCode(65 + idx); // Tạo chữ A, B, C, D
+                            htmlContent += `<div style="display: inline-block; width: 48%; margin-bottom: 5px;"><b>${char}.</b> ${opt}</div>`;
+                        });
+                    }
+                    htmlContent += `</div></div>`;
+                });
+            });
+
+            htmlContent += `</div>`;
+
+            // 2. Dùng thư viện html2pdf (đã nhúng ở teacher.html) để in
+            let opt = {
+                margin:       10,
+                filename:     `${exam.name}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            
+            // Thông báo đang tải
+            btnExportPDF.innerText = "Đang tạo PDF...";
+            html2pdf().set(opt).from(htmlContent).save().then(() => {
+                btnExportPDF.innerText = "Xuất PDF"; // Trả lại text cho nút
+            });
+        });
+    }
+
+    // ==========================================
+    // H. QUẢN LÝ HỌC SINH (TAB 4)
+    // ==========================================
     const btnAddStudent = document.getElementById('btnAddStudent');
     if (btnAddStudent) {
         btnAddStudent.addEventListener('click', async () => {
@@ -195,7 +288,6 @@ if (pageType === 'teacher') {
             try {
                 await setDoc(doc(db, "students", email), studentData);
                 alert("Lưu thông tin học sinh thành công!");
-                // Clear form
                 document.getElementById('stuEmail').value = "";
                 document.getElementById('stuName').value = "";
             } catch (e) {
@@ -204,21 +296,21 @@ if (pageType === 'teacher') {
         });
     }
 
-    // HÀM REAL-TIME CHO TAB 4 (TỰ ĐỘNG CẬP NHẬT KHI CÓ DATA MỚI)
+    // HÀM TẢI DANH SÁCH HỌC SINH REAL-TIME
     function loadStudentsRealtime() {
         onSnapshot(collection(db, "students"), (snapshot) => {
             const tbody = document.getElementById('studentListTable');
             if(!tbody) return;
             
-            tbody.innerHTML = ""; // Xóa dữ liệu cũ
+            tbody.innerHTML = ""; 
             snapshot.forEach((doc) => {
                 let data = doc.data();
                 tbody.innerHTML += `
-                    <tr>
-                        <td style="padding: 8px;">${data.email}</td>
-                        <td style="padding: 8px;">${data.name}</td>
-                        <td style="padding: 8px;">${data.class}</td>
-                        <td style="padding: 8px;">${data.phone}</td>
+                    <tr style="border-bottom: 1px solid #ddd;">
+                        <td style="padding: 10px;">${data.email}</td>
+                        <td style="padding: 10px;">${data.name}</td>
+                        <td style="padding: 10px;">${data.class}</td>
+                        <td style="padding: 10px;">${data.phone}</td>
                     </tr>
                 `;
             });

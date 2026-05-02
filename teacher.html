@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Quản trị Giáo Viên - FUEdu</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="apple-touch-icon" sizes="180x180" href=" https://res.cloudinary.com/dsnlbzjby/image/upload/q_auto/f_auto/v1777733568/ChatGPT_Image_21_41_38_2_thg_5__2026-removebg-preview_cdoroq.png">
+    <link rel="icon" href=" https://res.cloudinary.com/dsnlbzjby/image/upload/q_auto/f_auto/v1777733568/ChatGPT_Image_21_41_38_2_thg_5__2026-removebg-preview_cdoroq.png" sizes="32x32" type="image/png">
+
+</head>
+<body data-page="teacher">
+    <!-- Màn hình Đăng nhập -->
+    <div id="login-section" class="login-screen">
+        <img src="https://res.cloudinary.com/dsnlbzjby/image/upload/q_auto/f_auto/v1777733568/ChatGPT_Image_21_41_38_2_thg_5__2026-removebg-preview_cdoroq.png" alt="FUEdu Logo">
+        <h2>Cổng Quản Trị Giáo Viên FUEdu</h2>
+        <p style="margin-bottom: 20px; color: gray;">Chỉ tài khoản được cấp phép mới có thể đăng nhập</p>
+        <button id="btnLogin" class="btn btn-primary">Đăng nhập bằng Google</button>
+    </div>
+
+    <!-- Màn hình Quản trị -->
+    <div id="app-section" class="hidden">
+        <header>
+            <div class="logo"><img src="https://res.cloudinary.com/dsnlbzjby/image/upload/q_auto/f_auto/v1777733568/ChatGPT_Image_21_41_38_2_thg_5__2026-removebg-preview_cdoroq.png" alt="Logo"></div>
+            <div class="user-info">
+                <span id="userEmail"></span>
+                <button id="btnLogout" class="btn btn-danger">Đăng xuất</button>
+            </div>
+        </header>
+
+        <div class="admin-container">
+            <!-- Cột Menu -->
+            <div class="sidebar">
+                <button class="tab-btn active" data-target="tab-create">1. Tạo bài tập</button>
+                <button class="tab-btn" data-target="tab-settings">2. Cài đặt kiểm tra</button>
+                <button class="tab-btn" data-target="tab-manage">3. Quản lý kiểm tra</button>
+                <button class="tab-btn" data-target="tab-students">4. Quản lý học sinh</button>
+            </div>
+
+            <!-- TAB 1: TẠO BÀI TẬP -->
+            <div id="tab-create" class="tab-content active">
+                <h2>Tạo Bài Tập / Đề Thi Mới</h2>
+                <div class="card mt-20">
+                    <div class="form-group">
+                        <label>Môn học</label>
+                        <select id="subject" class="form-control">
+                            <option value="Tiếng Anh">Tiếng Anh</option>
+                            <option value="Khác">Khác</option>
+                        </select>
+                        <input type="text" id="otherSubject" class="form-control hidden" placeholder="Nhập tên môn học" style="margin-top: 10px;">
+                    </div>
+                    <div class="form-group">
+                        <label>Khối lớp</label>
+                        <select id="grade" class="form-control"><option>10</option><option>11</option><option>12</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tên đề (VD: ĐỀ KIỂM TRA CUỐI HỌC KỲ II)</label>
+                        <input type="text" id="examName" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Loại đề</label>
+                        <select id="examType" class="form-control">
+                            <option>ĐỀ MINH HỌA</option><option>ĐỀ CHÍNH THỨC</option><option>KHÔNG</option>
+                        </select>
+                    </div>
+                    <hr style="margin: 20px 0;">
+                    <h3>Soạn thảo nội dung</h3>
+                    <div id="sections-container">
+                        <!-- Nơi chứa các phần của đề được JS sinh ra -->
+                    </div>
+                    <button id="btnAddSection" class="btn btn-primary">+ Thêm Phần</button>
+                    <button id="btnSaveExam" class="btn btn-primary" style="background-color: #28a745; margin-left: 10px;">Lưu Đề Thi</button>
+                </div>
+            </div>
+
+            <!-- Các Tab khác -->
+            <div id="tab-settings" class="tab-content"><h2>Cài đặt kiểm tra</h2><p>Tính năng chọn thời gian, gán học sinh...</p></div>
+            <div id="tab-manage" class="tab-content"><h2>Quản lý bài kiểm tra</h2><p>Danh sách học sinh làm bài, chấm điểm...</p></div>
+            <div id="tab-students" class="tab-content"><h2>Quản lý tài khoản học sinh</h2><p>Thêm/Sửa/Xóa tài khoản học sinh...</p></div>
+        </div>
+    </div>
+
+    <!-- Nhúng logic chung -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Học Sinh - FUEdu</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="apple-touch-icon" sizes="180x180" href=" https://res.cloudinary.com/dsnlbzjby/image/upload/q_auto/f_auto/v1777733568/ChatGPT_Image_21_41_38_2_thg_5__2026-removebg-preview_cdoroq.png">
+    <link rel="icon" href=" https://res.cloudinary.com/dsnlbzjby/image/upload/q_auto/f_auto/v1777733568/ChatGPT_Image_21_41_38_2_thg_5__2026-removebg-preview_cdoroq.png" sizes="32x32" type="image/png">
+</head>
+<body data-page="student">
+    <!-- Màn hình đăng nhập học sinh -->
+    <div id="login-section" class="login-screen">
+        <img src="https://res.cloudinary.com/dsnlbzjby/image/upload/q_auto/f_auto/v1777733568/ChatGPT_Image_21_41_38_2_thg_5__2026-removebg-preview_cdoroq.png" alt="FUEdu Logo">
+        <h2>Cổng Ôn Tập Dành Cho Học Sinh</h2>
+        <button id="btnLogin" class="btn btn-primary" style="margin-top: 20px;">Đăng nhập bằng Google để làm bài</button>
+    </div>
+
+    <!-- Cổng thông tin học sinh -->
+    <div id="app-section" class="hidden">
+        <header>
+            <div class="logo"><img src="https://res.cloudinary.com/dsnlbzjby/image/upload/q_auto/f_auto/v1777733568/ChatGPT_Image_21_41_38_2_thg_5__2026-removebg-preview_cdoroq.png" alt="Logo"></div>
+            <div class="user-info">
+                <span id="studentName">Xin chào!</span>
+                <button id="btnLogout" class="btn btn-danger">Đăng xuất</button>
+            </div>
+        </header>
+
+        <div style="padding: 30px; max-width: 1000px; margin: auto;">
+            <h2>Danh sách bài tập / bài kiểm tra của bạn</h2>
+            <div class="card" style="margin-top: 20px;">
+                <p>Hệ thống sẽ tải các bài kiểm tra giáo viên đã giao tại đây.</p>
+                <button id="btnStartTest" class="btn btn-primary">Bắt đầu làm bài</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Nhúng logic chung -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>

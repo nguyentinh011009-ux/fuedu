@@ -7,10 +7,71 @@ import { auth, db, provider } from './config.js';
 const allowedTeacherEmails = ['nguyentinh52009@gmail.com', 'nguyentinh011009@gmail.com', 'tomizy09icloud@gmail.com'];
 const pageType = document.body.getAttribute('data-page');
 
-// --- BIẾN TOÀN CỤC LƯU DỮ LIỆU ---
-let allExams = []; // Mảng chứa toàn bộ đề thi để dùng cho việc Xuất PDF và Cài đặt
+let allExams = []; // Mảng toàn cục lưu đề thi
 
-// --- CÁC NÚT ĐĂNG NHẬP/ĐĂNG XUẤT ---
+// ==========================================
+// HÀM TẢI ĐỀ THI (CÓ BẮT LỖI ĐỂ BÁO LÊN MÀN HÌNH)
+// ==========================================
+function loadExamsRealtime() {
+    const selectSetting = document.getElementById('selectExamSetting');
+    const selectManage = document.getElementById('selectExamManage');
+    
+    if(!selectSetting || !selectManage) return;
+
+    selectSetting.innerHTML = '<option value="">Đang kết nối tới máy chủ...</option>';
+
+    onSnapshot(collection(db, "exams"), (snapshot) => {
+        selectSetting.innerHTML = '<option value="">-- Chọn đề thi --</option>';
+        selectManage.innerHTML = '<option value="">-- Chọn đề thi --</option>';
+        allExams = []; 
+
+        if (snapshot.empty) {
+            selectSetting.innerHTML = '<option value="">Chưa có đề thi nào trong CSDL (Hãy tạo đề)</option>';
+            return;
+        }
+
+        snapshot.forEach((doc) => {
+            let data = doc.data();
+            allExams.push({ id: doc.id, ...data }); 
+            let examName = data.name || "Đề không tên";
+            let optionHTML = `<option value="${doc.id}">[Khối ${data.grade}] ${examName} - ${data.subject}</option>`;
+            
+            selectSetting.innerHTML += optionHTML;
+            selectManage.innerHTML += optionHTML;
+        });
+    }, (error) => {
+        // NẾU BỊ LỖI QUYỀN TRUY CẬP SẼ BÁO Ở ĐÂY
+        console.error("Firebase Error: ", error);
+        selectSetting.innerHTML = '<option value="">LỖI: KHÔNG CÓ QUYỀN ĐỌC DỮ LIỆU!</option>';
+        alert("Lỗi tải đề thi từ Firebase!\nNguyên nhân: Bạn chưa cài đặt 'Rules' (Quy tắc) trong Firestore.\nHãy vào Firebase để sửa Rules.");
+    });
+}
+
+function loadStudentsRealtime() {
+    const tbody = document.getElementById('studentListTable');
+    if(!tbody) return;
+
+    onSnapshot(collection(db, "students"), (snapshot) => {
+        tbody.innerHTML = ""; 
+        snapshot.forEach((doc) => {
+            let data = doc.data();
+            tbody.innerHTML += `
+                <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 10px;">${data.email}</td>
+                    <td style="padding: 10px;">${data.name}</td>
+                    <td style="padding: 10px;">${data.class}</td>
+                    <td style="padding: 10px;">${data.phone}</td>
+                </tr>
+            `;
+        });
+    }, (error) => {
+        tbody.innerHTML = `<tr><td colspan="4" style="color:red; text-align:center;">Lỗi không thể tải Học sinh: ${error.message}</td></tr>`;
+    });
+}
+
+// ==========================================
+// KIỂM TRA ĐĂNG NHẬP
+// ==========================================
 const btnLogin = document.getElementById('btnLogin');
 const btnLogout = document.getElementById('btnLogout'); 
 const btnSidebarLogout = document.getElementById('btnSidebarLogout'); 
@@ -19,9 +80,6 @@ if (btnLogin) btnLogin.addEventListener('click', () => signInWithPopup(auth, pro
 if (btnLogout) btnLogout.addEventListener('click', () => signOut(auth));
 if (btnSidebarLogout) btnSidebarLogout.addEventListener('click', () => signOut(auth));
 
-// ==========================================
-// 1. KIỂM TRA ĐĂNG NHẬP (CHẠY CHO CẢ 2 TRANG)
-// ==========================================
 onAuthStateChanged(auth, (user) => {
     const loginSection = document.getElementById('login-section');
     const appSection = document.getElementById('app-section');
@@ -33,9 +91,9 @@ onAuthStateChanged(auth, (user) => {
                 if (appSection) appSection.classList.remove('hidden');
                 document.getElementById('userEmail').innerText = "Giáo viên: " + user.email;
                 
-                // GỌI HÀM LẤY DỮ LIỆU REAL-TIME
+                // KHI LOGIN THÀNH CÔNG THÌ GỌI 2 HÀM NÀY
                 loadStudentsRealtime(); 
-                loadExamsRealtime(); // <-- ĐÂY LÀ HÀM SẼ ĐỔ DỮ LIỆU VÀO TAB 2 VÀ TAB 3
+                loadExamsRealtime(); 
             } else {
                 alert("Bạn không có quyền truy cập trang Giáo viên!");
                 signOut(auth);
@@ -53,11 +111,11 @@ onAuthStateChanged(auth, (user) => {
 });
 
 // ==========================================
-// 2. LOGIC DÀNH RIÊNG CHO GIÁO VIÊN
+// CÁC TÍNH NĂNG CHỨC NĂNG (TAB 1, 2, 4)
 // ==========================================
 if (pageType === 'teacher') {
 
-    // A. CHUYỂN TAB
+    // CHUYỂN TAB
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             if(e.target.id === 'btnSidebarLogout') return;
@@ -70,7 +128,7 @@ if (pageType === 'teacher') {
         });
     });
 
-    // B. CHỌN MÔN HỌC
+    // MÔN HỌC (TAB 1)
     const subjectSelect = document.getElementById('subject');
     if (subjectSelect) {
         subjectSelect.addEventListener('change', (e) => {
@@ -78,7 +136,7 @@ if (pageType === 'teacher') {
         });
     }
 
-    // C. THÊM PHẦN (SECTIONS) TAB 1
+    // THÊM PHẦN (TAB 1)
     let sectionCount = 0;
     const btnAddSection = document.getElementById('btnAddSection');
     if (btnAddSection) {
@@ -101,7 +159,7 @@ if (pageType === 'teacher') {
         });
     }
 
-    // D. HÀM CẮT ĐỀ (PARSER) TAB 1
+    // PARSER (CẮT ĐỀ)
     function parseExamText(rawText, type) {
         let questions = [];
         let blocks = rawText.split(/(?:Câu|Question)\s+\d+\s*:/i).filter(b => b.trim().length > 0);
@@ -136,7 +194,7 @@ if (pageType === 'teacher') {
         return questions;
     }
 
-    // E. LƯU ĐỀ THI LÊN FIREBASE (TAB 1)
+    // LƯU ĐỀ THI
     const btnSaveExam = document.getElementById('btnSaveExam');
     if (btnSaveExam) {
         btnSaveExam.addEventListener('click', async () => {
@@ -164,6 +222,7 @@ if (pageType === 'teacher') {
                 sections: sectionsData
             };
 
+            btnSaveExam.innerText = "Đang lưu...";
             try {
                 await addDoc(collection(db, "exams"), examData);
                 alert("Lưu đề thành công! Hãy sang Tab Cài đặt để quản lý.");
@@ -171,77 +230,40 @@ if (pageType === 'teacher') {
                 document.getElementById('sections-container').innerHTML = "";
                 sectionCount = 0;
             } catch (error) {
-                alert("Lỗi lưu đề: " + error.message);
+                alert("LỖI KHÔNG THỂ LƯU ĐỀ: " + error.message + "\nHãy kiểm tra lại Rules Firebase!");
+            } finally {
+                btnSaveExam.innerText = "Nhận diện & Lưu Đề";
             }
         });
     }
 
-    // ==========================================
-    // F. HÀM TẢI DANH SÁCH ĐỀ THI CHO TAB 2 & 3
-    // ==========================================
-    function loadExamsRealtime() {
-        onSnapshot(collection(db, "exams"), (snapshot) => {
-            const selectSetting = document.getElementById('selectExamSetting');
-            const selectManage = document.getElementById('selectExamManage');
-            
-            if(!selectSetting || !selectManage) return;
-
-            // Xóa danh sách cũ
-            selectSetting.innerHTML = '<option value="">-- Chọn đề thi --</option>';
-            selectManage.innerHTML = '<option value="">-- Chọn đề thi --</option>';
-            allExams = []; // Reset mảng toàn cục
-
-            snapshot.forEach((doc) => {
-                let data = doc.data();
-                allExams.push({ id: doc.id, ...data }); // Lưu vào mảng để dùng cho việc in PDF
-
-                let examName = data.name || "Đề không tên";
-                let optionHTML = `<option value="${doc.id}">[Khối ${data.grade}] ${examName} - ${data.subject}</option>`;
-                
-                selectSetting.innerHTML += optionHTML;
-                selectManage.innerHTML += optionHTML;
-            });
-        }, (error) => {
-            console.error("Lỗi tải đề thi: ", error);
-        });
-    }
-
-    // ==========================================
-    // G. TÍNH NĂNG XUẤT ĐỀ THI RA FILE PDF (TAB 2)
-    // ==========================================
+    // XUẤT PDF (TAB 2)
     const btnExportPDF = document.getElementById('btnExportPDF');
     if (btnExportPDF) {
         btnExportPDF.addEventListener('click', () => {
             const examId = document.getElementById('selectExamSetting').value;
             if (!examId) return alert("Vui lòng chọn 1 đề thi ở danh sách bên trên để xuất PDF!");
 
-            // Tìm đề thi trong mảng đã tải
             const exam = allExams.find(e => e.id === examId);
             if(!exam) return alert("Không tìm thấy dữ liệu đề thi!");
 
-            // 1. Tạo chuỗi HTML chứa cấu trúc đề thi
             let htmlContent = `
                 <div style="padding: 20px; font-family: 'Times New Roman', serif; color: black; line-height: 1.5;">
                     <div style="text-align: center; margin-bottom: 20px;">
                         <h2 style="margin: 0; font-size: 20px;">HỆ THỐNG ÔN TẬP FUEDU</h2>
                         <h1 style="margin: 5px 0; font-size: 22px; text-transform: uppercase;">${exam.name}</h1>
                         <p style="margin: 0; font-style: italic;">Môn: ${exam.subject} - Khối: ${exam.grade}</p>
-                        <p style="margin: 0; font-style: italic;">Loại: ${exam.type}</p>
                     </div>
                     <hr style="border: 1px solid black; margin-bottom: 20px;">
             `;
 
             exam.sections.forEach(sec => {
-                htmlContent += `<h3 style="font-size: 18px; margin-top: 15px; text-transform: uppercase;">${sec.name}</h3>`;
+                htmlContent += `<h3 style="font-size: 18px; margin-top: 15px;">${sec.name}</h3>`;
                 sec.questions.forEach(q => {
-                    htmlContent += `<div style="margin-bottom: 10px;">
-                        <span style="font-weight: bold;">Câu ${q.id}:</span> ${q.content}
-                        <div style="margin-top: 5px; padding-left: 15px;">`;
-                    
+                    htmlContent += `<div style="margin-bottom: 10px;"><span style="font-weight: bold;">Câu ${q.id}:</span> ${q.content}<div style="margin-top: 5px; padding-left: 15px;">`;
                     if (q.options && q.options.length > 0) {
                         q.options.forEach((opt, idx) => {
-                            let char = String.fromCharCode(65 + idx); // Tạo chữ A, B, C, D
-                            htmlContent += `<div style="display: inline-block; width: 48%; margin-bottom: 5px;"><b>${char}.</b> ${opt}</div>`;
+                            htmlContent += `<div style="display: inline-block; width: 48%; margin-bottom: 5px;"><b>${String.fromCharCode(65 + idx)}.</b> ${opt}</div>`;
                         });
                     }
                     htmlContent += `</div></div>`;
@@ -250,26 +272,19 @@ if (pageType === 'teacher') {
 
             htmlContent += `</div>`;
 
-            // 2. Dùng thư viện html2pdf (đã nhúng ở teacher.html) để in
             let opt = {
-                margin:       10,
-                filename:     `${exam.name}.pdf`,
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2 },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                margin: 10, filename: `${exam.name}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
             
-            // Thông báo đang tải
             btnExportPDF.innerText = "Đang tạo PDF...";
-            html2pdf().set(opt).from(htmlContent).save().then(() => {
-                btnExportPDF.innerText = "Xuất PDF"; // Trả lại text cho nút
-            });
+            html2pdf().set(opt).from(htmlContent).save().then(() => btnExportPDF.innerText = "Xuất PDF");
         });
     }
 
-    // ==========================================
-    // H. QUẢN LÝ HỌC SINH (TAB 4)
-    // ==========================================
+    // THÊM HỌC SINH (TAB 4)
     const btnAddStudent = document.getElementById('btnAddStudent');
     if (btnAddStudent) {
         btnAddStudent.addEventListener('click', async () => {
@@ -277,45 +292,17 @@ if (pageType === 'teacher') {
             if(!email) return alert("Vui lòng nhập Email học sinh!");
 
             const studentData = {
-                email: email,
-                name: document.getElementById('stuName').value,
-                class: document.getElementById('stuClass').value,
-                phone: document.getElementById('stuPhone').value,
-                dob: document.getElementById('stuDob').value,
-                gender: document.getElementById('stuGender').value
+                email: email, name: document.getElementById('stuName').value,
+                class: document.getElementById('stuClass').value, phone: document.getElementById('stuPhone').value
             };
 
             try {
                 await setDoc(doc(db, "students", email), studentData);
                 alert("Lưu thông tin học sinh thành công!");
-                document.getElementById('stuEmail').value = "";
-                document.getElementById('stuName').value = "";
+                document.getElementById('stuEmail').value = ""; document.getElementById('stuName').value = "";
             } catch (e) {
                 alert("Lỗi lưu học sinh: " + e.message);
             }
-        });
-    }
-
-    // HÀM TẢI DANH SÁCH HỌC SINH REAL-TIME
-    function loadStudentsRealtime() {
-        onSnapshot(collection(db, "students"), (snapshot) => {
-            const tbody = document.getElementById('studentListTable');
-            if(!tbody) return;
-            
-            tbody.innerHTML = ""; 
-            snapshot.forEach((doc) => {
-                let data = doc.data();
-                tbody.innerHTML += `
-                    <tr style="border-bottom: 1px solid #ddd;">
-                        <td style="padding: 10px;">${data.email}</td>
-                        <td style="padding: 10px;">${data.name}</td>
-                        <td style="padding: 10px;">${data.class}</td>
-                        <td style="padding: 10px;">${data.phone}</td>
-                    </tr>
-                `;
-            });
-        }, (error) => {
-            console.error("Lỗi tải danh sách học sinh: ", error);
         });
     }
 }

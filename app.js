@@ -7,13 +7,66 @@ import { auth, db, provider } from './config.js';
 const allowedTeacherEmails = ['nguyentinh52009@gmail.com', 'nguyentinh011009@gmail.com', 'tomizy09icloud@gmail.com'];
 const pageType = document.body.getAttribute('data-page');
 
-let allExams = []; // Mảng toàn cục lưu đề thi
+let allExams = []; 
 
 // ==========================================
-// PHẦN 1: ĐỊNH NGHĨA CÁC HÀM (ĐẶT LÊN ĐẦU ĐỂ TRÁNH LỖI NOT DEFINED)
+// THUẬT TOÁN PARSER V2 (THÔNG MINH HƠN, TỰ LÀM SẠCH TEXT)
 // ==========================================
+function parseExamText(rawText, type) {
+    let questions = [];
+    
+    // Bước 1: Thêm dấu \n vào đầu để đảm bảo Regex hoạt động đúng với câu đầu tiên
+    let text = "\n" + rawText.trim();
+    
+    // Bước 2: Cắt khối câu hỏi. Hỗ trợ "Câu 1:", "Câu 1.", "Question 1:", "Question 1."
+    let blocks = text.split(/\n\s*(?:Câu|Question)\s*\d+[\.\:]?\s*/i).filter(b => b.trim().length > 0);
 
-// Hàm tải đề thi
+    blocks.forEach((block, index) => {
+        let qObj = { id: index + 1, content: "", type: type, options: [], correctAnswer: [] };
+
+        if (type === 'tn' || type === 'ds') {
+            // Bước 3: Cắt ranh giới giữa Nội dung câu hỏi và các đáp án A, B, C, D
+            // Dùng Lookahead (?=...) để tìm vị trí của "A.", "*A.", "A)", "*A)"...
+            let parts = block.split(/(?=\s*\*?[A-D][\.\)]\s)/i);
+            
+            // Phần đầu tiên là nội dung câu hỏi tinh khiết
+            qObj.content = parts[0].trim();
+
+            // Các phần tiếp theo là Đáp án
+            for (let i = 1; i < parts.length; i++) {
+                let optText = parts[i].trim();
+                let isCorrect = optText.startsWith('*');
+                
+                if (isCorrect) {
+                    optText = optText.substring(1).trim(); // Cắt bỏ dấu *
+                }
+
+                let letter = optText.charAt(0).toUpperCase();
+                if (isCorrect) qObj.correctAnswer.push(letter);
+
+                // LÀM SẠCH: Cắt bỏ chữ "A.", "B.", "A)", "B)" ở đầu đáp án để tránh bị lặp (A. A.)
+                optText = optText.replace(/^[A-D][\.\)]\s*/i, '').trim();
+                
+                qObj.options.push(optText);
+            }
+        } 
+        else if (type === 'tn_ngan') {
+            let match = block.match(/\[(.*?)\]/);
+            qObj.content = block.replace(/\[.*?\]/, '').trim();
+            qObj.correctAnswer = match ? match[1].trim() : "";
+        } 
+        else if (type === 'tl') {
+            qObj.content = block.trim();
+        }
+        
+        questions.push(qObj);
+    });
+    return questions;
+}
+
+// ==========================================
+// CÁC HÀM TẢI DỮ LIỆU
+// ==========================================
 function loadExamsRealtime() {
     const selectSetting = document.getElementById('selectExamSetting');
     const selectManage = document.getElementById('selectExamManage');
@@ -47,7 +100,6 @@ function loadExamsRealtime() {
     });
 }
 
-// Hàm tải danh sách học sinh
 function loadStudentsRealtime() {
     const tbody = document.getElementById('studentListTable');
     if(!tbody) return;
@@ -70,44 +122,8 @@ function loadStudentsRealtime() {
     });
 }
 
-// Hàm cắt đề (Parser)
-function parseExamText(rawText, type) {
-    let questions = [];
-    let blocks = rawText.split(/(?:Câu|Question)\s+\d+\s*:/i).filter(b => b.trim().length > 0);
-
-    blocks.forEach((block, index) => {
-        let qObj = { id: index + 1, content: "", type: type };
-
-        if (type === 'tn' || type === 'ds') {
-            let splitByOptions = block.split(/(?=\*?[A-D|a-d]\.)/);
-            qObj.content = splitByOptions[0].trim(); 
-            qObj.options = [];
-            qObj.correctAnswer = [];
-
-            for (let i = 1; i < splitByOptions.length; i++) {
-                let optText = splitByOptions[i].trim();
-                let isCorrect = optText.startsWith('*');
-                if (isCorrect) optText = optText.substring(1); 
-                qObj.options.push(optText);
-                if (isCorrect) qObj.correctAnswer.push(optText.charAt(0).toUpperCase()); 
-            }
-        } 
-        else if (type === 'tn_ngan') {
-            let match = block.match(/\[(.*?)\]/);
-            qObj.content = block.replace(/\[.*?\]/, '').trim();
-            qObj.correctAnswer = match ? match[1].trim() : "";
-        } 
-        else if (type === 'tl') {
-            qObj.content = block.trim();
-        }
-        questions.push(qObj);
-    });
-    return questions;
-}
-
-
 // ==========================================
-// PHẦN 2: XỬ LÝ ĐĂNG NHẬP (AUTH)
+// ĐĂNG NHẬP (AUTH)
 // ==========================================
 const btnLogin = document.getElementById('btnLogin');
 const btnLogout = document.getElementById('btnLogout'); 
@@ -128,7 +144,6 @@ onAuthStateChanged(auth, (user) => {
                 if (appSection) appSection.classList.remove('hidden');
                 document.getElementById('userEmail').innerText = "Giáo viên: " + user.email;
                 
-                // GỌI HÀM (Lúc này hàm chắc chắn đã được định nghĩa ở trên)
                 loadStudentsRealtime(); 
                 loadExamsRealtime(); 
             } else {
@@ -148,7 +163,7 @@ onAuthStateChanged(auth, (user) => {
 });
 
 // ==========================================
-// PHẦN 3: XỬ LÝ GIAO DIỆN & NÚT BẤM
+// CHỨC NĂNG CHÍNH (TAB GIÁO VIÊN)
 // ==========================================
 if (pageType === 'teacher') {
 
@@ -211,7 +226,7 @@ if (pageType === 'teacher') {
                 return {
                     name: item.querySelector('.section-name').value,
                     type: type,
-                    questions: parseExamText(raw, type) // Đã gọi được hàm an toàn
+                    questions: parseExamText(raw, type)
                 };
             });
 
@@ -265,7 +280,7 @@ if (pageType === 'teacher') {
                     htmlContent += `<div style="margin-bottom: 10px;"><span style="font-weight: bold;">Câu ${q.id}:</span> ${q.content}<div style="margin-top: 5px; padding-left: 15px;">`;
                     if (q.options && q.options.length > 0) {
                         q.options.forEach((opt, idx) => {
-                            htmlContent += `<div style="display: inline-block; width: 48%; margin-bottom: 5px;"><b>${String.fromCharCode(65 + idx)}.</b> ${opt}</div>`;
+                            htmlContent += `<div style="display: inline-block; width: 48%; margin-bottom: 5px; vertical-align: top;"><b>${String.fromCharCode(65 + idx)}.</b> ${opt}</div>`;
                         });
                     }
                     htmlContent += `</div></div>`;

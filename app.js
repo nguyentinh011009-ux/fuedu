@@ -1,169 +1,192 @@
 // app.js
-import { auth, db, provider, signInWithPopup, signOut, onAuthStateChanged, collection, addDoc } from './config.js';
+import { auth, db, provider, signInWithPopup, signOut, onAuthStateChanged, collection, addDoc, getDocs, doc, setDoc } from './config.js';
 
-// --- BIẾN TOÀN CỤC ---
 const allowedTeacherEmails = ['nguyentinh52009@gmail.com', 'nguyentinh011009@gmail.com', 'tomizy09icloud@gmail.com'];
-const pageType = document.body.getAttribute('data-page'); // Trả về 'teacher' hoặc 'student'
+const pageType = document.body.getAttribute('data-page');
 
-// --- CÁC DOM ELEMENTS CHUNG ---
 const btnLogin = document.getElementById('btnLogin');
-const btnLogout = document.getElementById('btnLogout');
-const loginSection = document.getElementById('login-section');
-const appSection = document.getElementById('app-section');
+const btnSidebarLogout = document.getElementById('btnSidebarLogout');
 
-// ==========================================
-// 1. XỬ LÝ AUTHENTICATION (ĐĂNG NHẬP/ĐĂNG XUẤT)
-// ==========================================
-if (btnLogin) {
-    btnLogin.addEventListener('click', () => {
-        signInWithPopup(auth, provider).catch(err => alert("Lỗi đăng nhập: " + err.message));
-    });
-}
+// 1. AUTH LOGIC
+if (btnLogin) btnLogin.addEventListener('click', () => signInWithPopup(auth, provider));
+if (btnSidebarLogout) btnSidebarLogout.addEventListener('click', () => signOut(auth));
 
-if (btnLogout) {
-    btnLogout.addEventListener('click', () => {
-        signOut(auth);
-    });
-}
-
-// Theo dõi trạng thái đăng nhập
 onAuthStateChanged(auth, (user) => {
     if (user) {
         if (pageType === 'teacher') {
-            // Kiểm tra quyền Giáo viên
             if (allowedTeacherEmails.includes(user.email)) {
-                loginSection.classList.add('hidden');
-                appSection.classList.remove('hidden');
-                document.getElementById('userEmail').innerText = user.email;
+                document.getElementById('login-section').classList.add('hidden');
+                document.getElementById('app-section').classList.remove('hidden');
+                document.getElementById('userEmail').innerText = "Giáo viên: " + user.email;
+                loadStudents(); // Tải ds học sinh khi login thành công
             } else {
-                alert("Tài khoản của bạn không có quyền truy cập quản trị Giáo viên!");
-                signOut(auth);
+                alert("Bạn không có quyền Giáo viên!"); signOut(auth);
             }
-        } else if (pageType === 'student') {
-            // Quyền Học sinh (Ai cũng vào được, nhưng sau này có thể filter qua DB)
-            loginSection.classList.add('hidden');
-            appSection.classList.remove('hidden');
-            document.getElementById('studentName').innerText = "Xin chào, " + user.displayName;
         }
     } else {
-        // Chưa đăng nhập
-        loginSection.classList.remove('hidden');
-        appSection.classList.add('hidden');
+        document.getElementById('login-section').classList.remove('hidden');
+        document.getElementById('app-section').classList.add('hidden');
     }
 });
 
 // ==========================================
-// 2. LOGIC DÀNH RIÊNG CHO TRANG GIÁO VIÊN
+// LOGIC GIÁO VIÊN
 // ==========================================
 if (pageType === 'teacher') {
 
-    // A. Xử lý chuyển Tabs
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
-
-    tabBtns.forEach(btn => {
+    // A. CHUYỂN TAB
+    document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            // Xóa active hiện tại
-            tabBtns.forEach(b => b.classList.remove('active'));
-            tabContents.forEach(c => c.classList.remove('active'));
-            
-            // Thêm active cho tab được chọn
+            if(e.target.id === 'btnSidebarLogout') return;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             e.target.classList.add('active');
-            const targetId = e.target.getAttribute('data-target');
-            document.getElementById(targetId).classList.add('active');
+            document.getElementById(e.target.getAttribute('data-target')).classList.add('active');
         });
     });
 
-    // B. Xử lý chọn Môn học (ẩn/hiện input Khác)
+    // B. CHỌN MÔN HỌC
     const subjectSelect = document.getElementById('subject');
-    const otherSubjectInput = document.getElementById('otherSubject');
-    
-    if (subjectSelect && otherSubjectInput) {
-        subjectSelect.addEventListener('change', (e) => {
-            if (e.target.value === 'Tiếng Anh') {
-                otherSubjectInput.classList.add('hidden');
-            } else {
-                otherSubjectInput.classList.remove('hidden');
-            }
-        });
-    }
+    subjectSelect.addEventListener('change', (e) => {
+        document.getElementById('otherSubject').classList.toggle('hidden', e.target.value === 'Tiếng Anh');
+    });
 
-    // C. Thêm phần đề (Sections)
+    // C. THÊM PHẦN (SECTIONS)
     let sectionCount = 0;
-    const btnAddSection = document.getElementById('btnAddSection');
-    const sectionsContainer = document.getElementById('sections-container');
+    document.getElementById('btnAddSection').addEventListener('click', () => {
+        sectionCount++;
+        const isEng = subjectSelect.value === 'Tiếng Anh';
+        const options = isEng 
+            ? `<option value="tn">Trắc nghiệm</option><option value="tl">Writing/Rewrite (Tự luận)</option>`
+            : `<option value="tn">Trắc nghiệm (4 đáp án)</option><option value="ds">Đúng - Sai</option><option value="tn_ngan">Trả lời ngắn (4 ký tự)</option><option value="tl">Tự luận</option>`;
+        
+        const html = `
+            <div class="card section-item" style="border-left: 4px solid blue;">
+                <h4>Phần ${sectionCount}</h4>
+                <input type="text" class="form-control section-name" placeholder="Tên phần" style="margin: 10px 0;">
+                <select class="form-control section-type" style="margin-bottom: 10px;">${options}</select>
+                <textarea class="form-control raw-text" placeholder="Dán đề thô vào đây... (Ví dụ: Câu 1: ... *A. ... B. ...)"></textarea>
+            </div>
+        `;
+        document.getElementById('sections-container').insertAdjacentHTML('beforeend', html);
+    });
 
-    if (btnAddSection) {
-        btnAddSection.addEventListener('click', () => {
-            sectionCount++;
-            const isEnglish = document.getElementById('subject').value === 'Tiếng Anh';
-            
-            // Sinh option dạng câu hỏi tùy theo môn học
-            const options = isEnglish 
-                ? `<option value="tn">Trắc nghiệm</option>
-                   <option value="rw">Rewrite/Writing</option>`
-                : `<option value="tn">Trắc nghiệm</option>
-                   <option value="ds">Đúng - Sai</option>
-                   <option value="tn_ngan">Trả lời ngắn</option>
-                   <option value="tl">Tự luận</option>`;
-            
-            const html = `
-                <div class="card section-item" style="background: #f9f9f9; border-left: 4px solid var(--primary-color);">
-                    <h4>Phần ${sectionCount}</h4>
-                    <input type="text" class="form-control section-name" placeholder="Tên phần (VD: Phần I. Trắc nghiệm...)" style="margin: 10px 0;">
-                    <select class="form-control section-type" style="margin-bottom: 10px;">
-                        ${options}
-                    </select>
-                    <textarea class="form-control raw-text" placeholder="Dán đề thô vào đây... (Chú ý: Đáp án đúng có dấu * trước chữ cái)"></textarea>
-                </div>
-            `;
-            sectionsContainer.insertAdjacentHTML('beforeend', html);
-        });
-    }
+    // ==========================================
+    // D. THUẬT TOÁN PARSER NHẬN DIỆN ĐỀ (RẤT QUAN TRỌNG)
+    // ==========================================
+    function parseExamText(rawText, type) {
+        let questions = [];
+        // Cắt text theo chữ "Câu 1:", "Câu 2:", hoặc "Question 1:"
+        let blocks = rawText.split(/(?:Câu|Question)\s+\d+\s*:/i).filter(b => b.trim().length > 0);
 
-    // D. Xử lý Lưu Đề lên Firebase
-    const btnSaveExam = document.getElementById('btnSaveExam');
-    if (btnSaveExam) {
-        btnSaveExam.addEventListener('click', async () => {
-            // Gom dữ liệu từ Form
-            const subject = document.getElementById('subject').value === 'Khác' 
-                ? document.getElementById('otherSubject').value 
-                : 'Tiếng Anh';
+        blocks.forEach((block, index) => {
+            let qObj = { id: index + 1, content: "", type: type };
 
-            const examData = {
-                subject: subject,
-                grade: document.getElementById('grade').value,
-                name: document.getElementById('examName').value,
-                type: document.getElementById('examType').value,
-                createdAt: new Date(),
-                // Thu thập nội dung thô của các phần
-                sections: Array.from(document.querySelectorAll('.section-item')).map(item => ({
-                    name: item.querySelector('.section-name').value,
-                    type: item.querySelector('.section-type').value,
-                    rawContent: item.querySelector('.raw-text').value
-                }))
-            };
+            if (type === 'tn' || type === 'ds') {
+                // Tách nội dung câu hỏi và các đáp án A, B, C, D (hoặc a, b, c, d)
+                // Tìm vị trí chữ A. hoặc *A.
+                let splitByOptions = block.split(/(?=\*?[A-D|a-d]\.)/);
+                qObj.content = splitByOptions[0].trim(); // Phần đầu tiên là nội dung câu hỏi
+                qObj.options = [];
+                qObj.correctAnswer = [];
 
-            // Lưu lên Firestore
-            try {
-                const docRef = await addDoc(collection(db, "exams"), examData);
-                alert("Đã tạo đề thành công! \nID Đề trên CSDL: " + docRef.id);
-                // (Tùy chọn: clear form sau khi lưu)
-            } catch (error) {
-                alert("Đã xảy ra lỗi khi lưu đề: " + error.message);
+                for (let i = 1; i < splitByOptions.length; i++) {
+                    let optText = splitByOptions[i].trim();
+                    let isCorrect = optText.startsWith('*');
+                    
+                    if (isCorrect) optText = optText.substring(1); // Bỏ dấu sao
+                    qObj.options.push(optText);
+                    
+                    if (isCorrect) {
+                        qObj.correctAnswer.push(optText.charAt(0).toUpperCase()); // Lưu lại ký tự A, B, C, D
+                    }
+                }
+            } 
+            else if (type === 'tn_ngan') {
+                // Trả lời ngắn: Bắt nội dung câu hỏi và tìm đáp án trong ngoặc vuông VD: [ABCD]
+                let match = block.match(/\[(.*?)\]/);
+                qObj.content = block.replace(/\[.*?\]/, '').trim();
+                qObj.correctAnswer = match ? match[1].trim() : "";
+            } 
+            else if (type === 'tl') {
+                // Tự luận: Lấy nguyên text
+                qObj.content = block.trim();
             }
+            questions.push(qObj);
         });
+        return questions;
     }
-}
 
-// ==========================================
-// 3. LOGIC DÀNH RIÊNG CHO TRANG HỌC SINH
-// ==========================================
-if (pageType === 'student') {
-    const btnStartTest = document.getElementById('btnStartTest');
-    if (btnStartTest) {
-        btnStartTest.addEventListener('click', () => {
-            alert('Tính năng làm bài đang được phát triển. Dữ liệu đề thi sẽ được parser và đổ ra màn hình này!');
+    // E. LƯU ĐỀ THI
+    document.getElementById('btnSaveExam').addEventListener('click', async () => {
+        const sectionsData = Array.from(document.querySelectorAll('.section-item')).map(item => {
+            const raw = item.querySelector('.raw-text').value;
+            const type = item.querySelector('.section-type').value;
+            return {
+                name: item.querySelector('.section-name').value,
+                type: type,
+                questions: parseExamText(raw, type) // Gọi hàm Parser
+            };
+        });
+
+        const examData = {
+            subject: subjectSelect.value === 'Khác' ? document.getElementById('otherSubject').value : 'Tiếng Anh',
+            grade: document.getElementById('grade').value,
+            name: document.getElementById('examName').value,
+            type: document.getElementById('examType').value,
+            createdAt: new Date(),
+            sections: sectionsData
+        };
+
+        try {
+            await addDoc(collection(db, "exams"), examData);
+            alert("Đã phân tích và lưu đề thành công!");
+            console.log(examData); // Mở F12 -> Console để xem cấu trúc đề đã được bóc tách
+        } catch (error) {
+            alert("Lỗi lưu đề: " + error.message);
+        }
+    });
+
+    // ==========================================
+    // F. QUẢN LÝ TÀI KHOẢN HỌC SINH (TAB 4)
+    // ==========================================
+    document.getElementById('btnAddStudent').addEventListener('click', async () => {
+        const email = document.getElementById('stuEmail').value.trim();
+        if(!email) return alert("Vui lòng nhập Email học sinh!");
+
+        const studentData = {
+            email: email,
+            name: document.getElementById('stuName').value,
+            class: document.getElementById('stuClass').value,
+            phone: document.getElementById('stuPhone').value,
+            dob: document.getElementById('stuDob').value,
+            gender: document.getElementById('stuGender').value
+        };
+
+        try {
+            // Dùng setDoc để tạo hoặc ghi đè học sinh theo ID là Email của họ
+            await setDoc(doc(db, "students", email), studentData);
+            alert("Đã cập nhật thông tin học sinh!");
+            loadStudents(); // Tải lại bảng
+        } catch (e) {
+            alert("Lỗi: " + e.message);
+        }
+    });
+
+    async function loadStudents() {
+        const querySnapshot = await getDocs(collection(db, "students"));
+        const tbody = document.getElementById('studentListTable');
+        tbody.innerHTML = "";
+        querySnapshot.forEach((doc) => {
+            let data = doc.data();
+            tbody.innerHTML += `
+                <tr>
+                    <td style="padding: 5px;">${data.email}</td>
+                    <td style="padding: 5px;">${data.name}</td>
+                    <td style="padding: 5px;">${data.class}</td>
+                    <td style="padding: 5px;">${data.phone}</td>
+                </tr>
+            `;
         });
     }
 }

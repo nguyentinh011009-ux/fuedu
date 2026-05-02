@@ -10,8 +10,10 @@ const pageType = document.body.getAttribute('data-page');
 let allExams = []; // Mảng toàn cục lưu đề thi
 
 // ==========================================
-// HÀM TẢI ĐỀ THI (CÓ BẮT LỖI ĐỂ BÁO LÊN MÀN HÌNH)
+// PHẦN 1: ĐỊNH NGHĨA CÁC HÀM (ĐẶT LÊN ĐẦU ĐỂ TRÁNH LỖI NOT DEFINED)
 // ==========================================
+
+// Hàm tải đề thi
 function loadExamsRealtime() {
     const selectSetting = document.getElementById('selectExamSetting');
     const selectManage = document.getElementById('selectExamManage');
@@ -40,13 +42,12 @@ function loadExamsRealtime() {
             selectManage.innerHTML += optionHTML;
         });
     }, (error) => {
-        // NẾU BỊ LỖI QUYỀN TRUY CẬP SẼ BÁO Ở ĐÂY
         console.error("Firebase Error: ", error);
         selectSetting.innerHTML = '<option value="">LỖI: KHÔNG CÓ QUYỀN ĐỌC DỮ LIỆU!</option>';
-        alert("Lỗi tải đề thi từ Firebase!\nNguyên nhân: Bạn chưa cài đặt 'Rules' (Quy tắc) trong Firestore.\nHãy vào Firebase để sửa Rules.");
     });
 }
 
+// Hàm tải danh sách học sinh
 function loadStudentsRealtime() {
     const tbody = document.getElementById('studentListTable');
     if(!tbody) return;
@@ -69,8 +70,44 @@ function loadStudentsRealtime() {
     });
 }
 
+// Hàm cắt đề (Parser)
+function parseExamText(rawText, type) {
+    let questions = [];
+    let blocks = rawText.split(/(?:Câu|Question)\s+\d+\s*:/i).filter(b => b.trim().length > 0);
+
+    blocks.forEach((block, index) => {
+        let qObj = { id: index + 1, content: "", type: type };
+
+        if (type === 'tn' || type === 'ds') {
+            let splitByOptions = block.split(/(?=\*?[A-D|a-d]\.)/);
+            qObj.content = splitByOptions[0].trim(); 
+            qObj.options = [];
+            qObj.correctAnswer = [];
+
+            for (let i = 1; i < splitByOptions.length; i++) {
+                let optText = splitByOptions[i].trim();
+                let isCorrect = optText.startsWith('*');
+                if (isCorrect) optText = optText.substring(1); 
+                qObj.options.push(optText);
+                if (isCorrect) qObj.correctAnswer.push(optText.charAt(0).toUpperCase()); 
+            }
+        } 
+        else if (type === 'tn_ngan') {
+            let match = block.match(/\[(.*?)\]/);
+            qObj.content = block.replace(/\[.*?\]/, '').trim();
+            qObj.correctAnswer = match ? match[1].trim() : "";
+        } 
+        else if (type === 'tl') {
+            qObj.content = block.trim();
+        }
+        questions.push(qObj);
+    });
+    return questions;
+}
+
+
 // ==========================================
-// KIỂM TRA ĐĂNG NHẬP
+// PHẦN 2: XỬ LÝ ĐĂNG NHẬP (AUTH)
 // ==========================================
 const btnLogin = document.getElementById('btnLogin');
 const btnLogout = document.getElementById('btnLogout'); 
@@ -91,7 +128,7 @@ onAuthStateChanged(auth, (user) => {
                 if (appSection) appSection.classList.remove('hidden');
                 document.getElementById('userEmail').innerText = "Giáo viên: " + user.email;
                 
-                // KHI LOGIN THÀNH CÔNG THÌ GỌI 2 HÀM NÀY
+                // GỌI HÀM (Lúc này hàm chắc chắn đã được định nghĩa ở trên)
                 loadStudentsRealtime(); 
                 loadExamsRealtime(); 
             } else {
@@ -111,7 +148,7 @@ onAuthStateChanged(auth, (user) => {
 });
 
 // ==========================================
-// CÁC TÍNH NĂNG CHỨC NĂNG (TAB 1, 2, 4)
+// PHẦN 3: XỬ LÝ GIAO DIỆN & NÚT BẤM
 // ==========================================
 if (pageType === 'teacher') {
 
@@ -159,41 +196,6 @@ if (pageType === 'teacher') {
         });
     }
 
-    // PARSER (CẮT ĐỀ)
-    function parseExamText(rawText, type) {
-        let questions = [];
-        let blocks = rawText.split(/(?:Câu|Question)\s+\d+\s*:/i).filter(b => b.trim().length > 0);
-
-        blocks.forEach((block, index) => {
-            let qObj = { id: index + 1, content: "", type: type };
-
-            if (type === 'tn' || type === 'ds') {
-                let splitByOptions = block.split(/(?=\*?[A-D|a-d]\.)/);
-                qObj.content = splitByOptions[0].trim(); 
-                qObj.options = [];
-                qObj.correctAnswer = [];
-
-                for (let i = 1; i < splitByOptions.length; i++) {
-                    let optText = splitByOptions[i].trim();
-                    let isCorrect = optText.startsWith('*');
-                    if (isCorrect) optText = optText.substring(1); 
-                    qObj.options.push(optText);
-                    if (isCorrect) qObj.correctAnswer.push(optText.charAt(0).toUpperCase()); 
-                }
-            } 
-            else if (type === 'tn_ngan') {
-                let match = block.match(/\[(.*?)\]/);
-                qObj.content = block.replace(/\[.*?\]/, '').trim();
-                qObj.correctAnswer = match ? match[1].trim() : "";
-            } 
-            else if (type === 'tl') {
-                qObj.content = block.trim();
-            }
-            questions.push(qObj);
-        });
-        return questions;
-    }
-
     // LƯU ĐỀ THI
     const btnSaveExam = document.getElementById('btnSaveExam');
     if (btnSaveExam) {
@@ -209,7 +211,7 @@ if (pageType === 'teacher') {
                 return {
                     name: item.querySelector('.section-name').value,
                     type: type,
-                    questions: parseExamText(raw, type)
+                    questions: parseExamText(raw, type) // Đã gọi được hàm an toàn
                 };
             });
 
@@ -230,7 +232,7 @@ if (pageType === 'teacher') {
                 document.getElementById('sections-container').innerHTML = "";
                 sectionCount = 0;
             } catch (error) {
-                alert("LỖI KHÔNG THỂ LƯU ĐỀ: " + error.message + "\nHãy kiểm tra lại Rules Firebase!");
+                alert("LỖI KHÔNG THỂ LƯU ĐỀ: " + error.message);
             } finally {
                 btnSaveExam.innerText = "Nhận diện & Lưu Đề";
             }

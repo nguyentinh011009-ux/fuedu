@@ -72,7 +72,7 @@ async function checkUserInDatabase(user) {
         if (!userSnap.exists()) {
             // TÀI KHOẢN MỚI -> Hiện bước xác nhận thông tin
             isNewUser = true;
-            document.getElementById("confirm-avatar").src = user.photoURL || "https://via.placeholder.com/70";
+            document.getElementById("confirm-avatar").src = user.photoURL || "https://res.cloudinary.com/dsnlbzjby/image/upload/q_auto/f_auto/v1779194252/ChatGPT_Image_19_26_47_19_thg_5_2026_x7nng0.png";
             document.getElementById("confirm-name").textContent = user.displayName;
             document.getElementById("confirm-email").textContent = user.email;
             showScreen(screenConfirmInfo);

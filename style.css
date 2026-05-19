@@ -445,3 +445,17 @@ input:checked + .slider:before { transform: translateX(20px); }
     color: #FF416C; font-weight: 800;
     background: transparent; outline: none;
 }
+/* CSS cho nút gạt Thu/Chi */
+.tx-toggle-container {
+    display: flex; justify-content: center; margin-bottom: 15px;
+}
+.tx-toggle {
+    display: flex; background: #E3E9F0; border-radius: 12px; padding: 4px; width: 100%; max-width: 300px;
+}
+.toggle-btn {
+    flex: 1; padding: 8px 0; border: none; background: transparent; 
+    border-radius: 10px; font-weight: bold; color: var(--text-muted); cursor: pointer;
+    transition: all 0.3s ease;
+}
+.toggle-btn.active[data-type="expense"] { background: var(--white); color: var(--color-expense); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+.toggle-btn.active[data-type="income"] { background: var(--white); color: var(--color-income); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }

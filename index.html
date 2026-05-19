@@ -93,7 +93,13 @@
                 </select>
                 <button class="btn-search-submit"><i class="fas fa-search"></i></button>
             </div>
-
+<!-- Nút gạt chuyển đổi Thu / Chi -->
+<div class="tx-toggle-container">
+    <div class="tx-toggle">
+        <button class="toggle-btn active" data-type="expense">Tiền Chi</button>
+        <button class="toggle-btn" data-type="income">Tiền Thu</button>
+    </div>
+</div>
             <!-- Tóm tắt số dư các nguồn tiền -->
             <div class="wallet-summary-scroll">
                 <div class="summary-card">
@@ -164,29 +170,6 @@
                         <i class="fas fa-edit text-blue"></i>
                         <i class="fas fa-trash text-red"></i>
                     </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- TAB 3: GIAO DỊCH (THU) -->
-        <section id="tab-income" class="tab-content">
-            <!-- Tương tự Tab 1 nhưng màu xanh và ghi có -->
-            <div class="wallet-summary-scroll">
-                <div class="summary-card total-income">
-                    <p>Tổng thu tháng này</p>
-                    <h4>+25.000.000đ</h4>
-                </div>
-            </div>
-
-            <h3 class="section-title">Lịch sử giao dịch (Thu)</h3>
-            <div class="transaction-list" id="income-list">
-                <div class="tx-item income">
-                    <div class="tx-icon"><i class="fas fa-hand-holding-usd"></i></div>
-                    <div class="tx-info">
-                        <h4>Lương tháng 10</h4>
-                        <p>Vietcombank • 10:00 05/10</p>
-                    </div>
-                    <div class="tx-amount">+25.000.000đ</div>
                 </div>
             </div>
         </section>
@@ -291,7 +274,13 @@
             <div class="modal-body">
                 <!-- Ô nhập số tiền to nhất -->
                 <input type="number" placeholder="0" class="input-amount-large" id="tx-amount">
-                
+                <div class="form-group">
+    <label>Loại giao dịch</label>
+    <select class="form-control" id="tx-type-select">
+        <option value="expense">Khoản Chi (-)</option>
+        <option value="income">Khoản Thu (+)</option>
+    </select>
+</div>
                 <div class="form-group">
                     <label>Phân loại (Tag)</label>
                     <select class="form-control" id="tx-tag">

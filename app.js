@@ -1,7 +1,5 @@
 // 1. IMPORT FIREBASE VÀ CÁC BIẾN TỪ AUTH.JS
-import { auth, db } from './auth.js';
-import { collection, addDoc, getDocs, doc, updateDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
+import { collection, addDoc, getDocs, doc, updateDoc, query, where, serverTimestamp, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 document.addEventListener("DOMContentLoaded", () => {
     
     // --- LẤY CÁC DOM ELEMENTS NHƯ CŨ ---
@@ -20,7 +18,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const closeButtons = document.querySelectorAll(".close-modal");
 
     let currentTab = "tab-expense";
-
+// Gọi hàm khi Firebase báo đăng nhập xong
+auth.onAuthStateChanged((user) => {
+    if (user) {
+        loadRealtimeWallets();
+        loadRealtimeTransactions();
+    }
+});
     // ==========================================
     // LOGIC UI: CUỘN, CHUYỂN TAB, ĐÓNG MỞ POPUP (GIỮ NGUYÊN)
     // ==========================================
@@ -237,3 +241,129 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
 });
+function loadRealtimeWallets() {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const walletScroll = document.querySelector(".wallet-summary-scroll");
+    const q = query(collection(db, "wallets"), where("userId", "==", user.uid));
+    
+    // onSnapshot giúp dữ liệu tự động cập nhật khi có giao dịch mới mà không cần F5
+    onSnapshot(q, (snapshot) => {
+        let total = 0;
+        let html = '';
+        
+        snapshot.forEach(doc => {
+            const w = doc.data();
+            total += w.balance;
+            html += `
+                <div class="summary-card">
+                    <p>${w.name}</p>
+                    <h4>${w.balance.toLocaleString('vi-VN')}đ</h4>
+                </div>
+            `;
+        });
+        
+        // Thêm thẻ Tổng cộng vào cuối
+        html += `
+            <div class="summary-card total">
+                <p>Tổng tài sản</p>
+                <h4>${total.toLocaleString('vi-VN')}đ</h4>
+            </div>
+        `;
+        walletScroll.innerHTML = html;
+    });
+}
+let allTransactions = []; // Biến lưu tạm để làm tính năng tìm kiếm
+
+function loadRealtimeTransactions() {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const listDiv = document.getElementById("expense-list");
+    // Sắp xếp ngày tạo giảm dần (mới nhất lên đầu)
+    const q = query(collection(db, "transactions"), where("userId", "==", user.uid), orderBy("createdAt", "desc"));
+
+    onSnapshot(q, (snapshot) => {
+        allTransactions = [];
+        let html = '';
+        
+        snapshot.forEach(doc => {
+            const tx = doc.data();
+            allTransactions.push(tx); // Lưu vào mảng tạm
+            
+            const isExpense = tx.type === 'expense';
+            const sign = isExpense ? '-' : '+';
+            const colorClass = isExpense ? 'expense' : 'income';
+            const icon = isExpense ? '<i class="fas fa-shopping-bag"></i>' : '<i class="fas fa-hand-holding-usd"></i>';
+            const date = tx.createdAt ? new Date(tx.createdAt.toDate()).toLocaleDateString('vi-VN') : 'Vừa xong';
+
+            html += `
+                <div class="tx-item ${colorClass}">
+                    <div class="tx-icon">${icon}</div>
+                    <div class="tx-info">
+                        <h4>${tx.tag}</h4>
+                        <p>${tx.note} • ${date}</p>
+                    </div>
+                    <div class="tx-amount">${sign}${tx.amount.toLocaleString('vi-VN')}đ</div>
+                </div>
+            `;
+        });
+        
+        listDiv.innerHTML = html || "<p style='text-align:center; color:#999; margin-top:20px;'>Chưa có giao dịch nào.</p>";
+    });
+}
+// Xử lý nút gạt Thu/Chi
+const toggleBtns = document.querySelectorAll(".toggle-btn");
+toggleBtns.forEach(btn => {
+    btn.addEventListener("click", (e) => {
+        // Đổi màu nút
+        toggleBtns.forEach(b => b.classList.remove("active"));
+        e.target.classList.add("active");
+        
+        const type = e.target.getAttribute("data-type");
+        filterTransactions(type); // Gọi hàm lọc
+    });
+});
+
+// Xử lý ô Tìm kiếm
+const searchInput = document.querySelector(".search-input");
+searchInput.addEventListener("input", (e) => {
+    filterTransactions(null, e.target.value);
+});
+
+// Hàm lọc giao dịch dùng chung
+function filterTransactions(typeFilter = null, searchKeyword = "") {
+    // Lấy type hiện tại đang active trên nút gạt nếu ko truyền vào
+    if(!typeFilter) {
+        typeFilter = document.querySelector(".toggle-btn.active").getAttribute("data-type");
+    }
+    
+    const listDiv = document.getElementById("expense-list");
+    let filteredList = allTransactions.filter(tx => tx.type === typeFilter);
+
+    if (searchKeyword.trim() !== "") {
+        filteredList = filteredList.filter(tx => tx.note.toLowerCase().includes(searchKeyword.toLowerCase()));
+    }
+
+    // Render lại y hệt như hàm loadRealtime (bạn có thể tách phần render HTML ra 1 hàm riêng cho gọn code)
+    let html = '';
+    filteredList.forEach(tx => {
+        const isExpense = tx.type === 'expense';
+        const sign = isExpense ? '-' : '+';
+        const colorClass = isExpense ? 'expense' : 'income';
+        const icon = isExpense ? '<i class="fas fa-shopping-bag"></i>' : '<i class="fas fa-hand-holding-usd"></i>';
+        
+        html += `
+            <div class="tx-item ${colorClass}">
+                <div class="tx-icon">${icon}</div>
+                <div class="tx-info">
+                    <h4>${tx.tag}</h4>
+                    <p>${tx.note}</p>
+                </div>
+                <div class="tx-amount">${sign}${tx.amount.toLocaleString('vi-VN')}đ</div>
+            </div>
+        `;
+    });
+    listDiv.innerHTML = html || "<p style='text-align:center; color:#999;'>Không tìm thấy giao dịch.</p>";
+}

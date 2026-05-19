@@ -185,3 +185,4 @@ document.querySelector(".danger").addEventListener("click", async () => {
     await signOut(auth);
     location.reload(); // Reset lại trang
 });
+export { auth, db };

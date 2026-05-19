@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Quản Lý Chi Tiêu</title>
+    <!-- Link Font & Icons (FontAwesome) -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Link CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- ========================================== -->
+    <!-- MÀN HÌNH ĐĂNG NHẬP / ONBOARDING (OVERLAY) -->
+    <!-- ========================================== -->
+    <div id="auth-overlay" class="auth-wrapper">
+        
+        <!-- Bước 1: Đăng nhập Google -->
+        <div id="screen-login" class="auth-screen active">
+            <img src="https://res.cloudinary.com/dsnlbzjby/image/upload/q_auto/f_auto/v1779194252/ChatGPT_Image_19_26_47_19_thg_5_2026_x7nng0.png" alt="Logo" class="auth-logo" width="100">
+            <h2>Quản Lý Chi Tiêu</h2>
+            <p>Ứng dụng quản lý tài chính thông minh</p>
+            <button id="btn-google-login" class="btn-google">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="G" width="24">
+                Đăng nhập bằng Google
+            </button>
+        </div>
+
+        <!-- Bước 2: Kiểm tra thông tin (Dành cho User mới) -->
+        <div id="screen-confirm-info" class="auth-screen">
+            <h2>Xác nhận thông tin</h2>
+            <div class="user-info-card">
+                <img id="confirm-avatar" src="" alt="Avatar" class="avatar-large">
+                <h3 id="confirm-name">Tên người dùng</h3>
+                <p id="confirm-email">email@gmail.com</p>
+            </div>
+            <p class="text-muted" style="margin-top: 15px; font-size: 0.9rem;">Hệ thống sẽ tạo tài khoản bằng thông tin Google của bạn.</p>
+            <button id="btn-confirm-info" class="btn-primary w-100" style="margin-top: 20px;">Xác nhận tạo tài khoản</button>
+        </div>
+
+        <!-- Bước 3: Nhập/Tạo Passcode -->
+        <div id="screen-passcode" class="auth-screen">
+            <h2 id="passcode-title">Tạo Passcode</h2>
+            <p id="passcode-desc">Nhập 6 số để bảo vệ ứng dụng của bạn</p>
+            <input type="password" id="input-passcode" maxlength="6" inputmode="numeric" placeholder="------" class="passcode-input">
+            <button id="btn-submit-passcode" class="btn-primary w-100" style="margin-top: 20px;">Xác nhận</button>
+        </div>
+
+        <!-- Bước 4: Hỏi Sinh trắc học (Dành cho User mới) -->
+        <div id="screen-biometrics" class="auth-screen">
+            <i class="fas fa-fingerprint" style="font-size: 4rem; color: #FF416C; margin-bottom: 20px;"></i>
+            <h2>Đăng nhập nhanh</h2>
+            <p>Sử dụng Sinh trắc học (Vân tay/Khuôn mặt) để mở khóa ứng dụng nhanh hơn vào lần sau.</p>
+            <button id="btn-enable-bio" class="btn-primary w-100" style="margin-bottom: 10px;">Dùng sinh trắc học</button>
+            <button id="btn-skip-bio" class="btn-secondary w-100">Không dùng</button>
+        </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- HEADER -->
+    <!-- ========================================== -->
+    <header id="main-header">
+        <div class="logo-container">
+            <img src="https://res.cloudinary.com/dsnlbzjby/image/upload/q_auto/f_auto/v1779194252/ChatGPT_Image_19_26_47_19_thg_5_2026_x7nng0.png" alt="Logo" class="header-logo" width="35">
+            <h1 id="header-title">Giao dịch (Chi)</h1>
+        </div>
+        <!-- Các nút hành động trên Header (chỉ hiện ở Tab 1 và Tab 3) -->
+        <div class="header-actions" id="header-actions">
+            <i class="fas fa-search" id="btn-search"></i>
+            <i class="fas fa-plus-circle" id="btn-add-transaction"></i>
+        </div>
+    </header>
+
+
+    <!-- ========================================== -->
+    <!-- NỘI DUNG CHÍNH (MAIN CONTENT) -->
+    <!-- ========================================== -->
+    <main id="main-content">
+        
+        <!-- TAB 1: GIAO DỊCH (CHI) -->
+        <section id="tab-expense" class="tab-content active">
+            <!-- Khu vực tìm kiếm (Mặc định ẩn, bấm nút kính lúp trên header sẽ hiện) -->
+            <div id="search-filter-bar" class="search-bar hidden">
+                <input type="text" placeholder="Tìm theo ghi chú..." class="search-input">
+                <select class="filter-tag">
+                    <option value="">Tất cả Tag</option>
+                    <option value="an_uong">Ăn uống</option>
+                    <option value="di_lai">Đi lại</option>
+                    <option value="mua_sam">Mua sắm</option>
+                </select>
+                <button class="btn-search-submit"><i class="fas fa-search"></i></button>
+            </div>
+
+            <!-- Tóm tắt số dư các nguồn tiền -->
+            <div class="wallet-summary-scroll">
+                <div class="summary-card">
+                    <p>Tiền mặt</p>
+                    <h4>2.500.000đ</h4>
+                </div>
+                <div class="summary-card">
+                    <p>Vietcombank</p>
+                    <h4>15.000.000đ</h4>
+                </div>
+                <div class="summary-card total">
+                    <p>Tổng cộng</p>
+                    <h4>17.500.000đ</h4>
+                </div>
+            </div>
+
+            <h3 class="section-title">Lịch sử giao dịch (Chi)</h3>
+            <div class="transaction-list" id="expense-list">
+                <!-- Data Demo -->
+                <div class="tx-item expense">
+                    <div class="tx-icon"><i class="fas fa-utensils"></i></div>
+                    <div class="tx-info">
+                        <h4>Ăn trưa</h4>
+                        <p>Tiền mặt • 12:30 15/10</p>
+                    </div>
+                    <div class="tx-amount">-50.000đ</div>
+                </div>
+                <div class="tx-item expense">
+                    <div class="tx-icon"><i class="fas fa-gas-pump"></i></div>
+                    <div class="tx-info">
+                        <h4>Đổ xăng</h4>
+                        <p>Vietcombank • 08:00 14/10</p>
+                    </div>
+                    <div class="tx-amount">-100.000đ</div>
+                </div>
+                <!-- Copy thêm vài item để test cuộn trang -->
+            </div>
+        </section>
+
+        <!-- TAB 2: NGUỒN TIỀN -->
+        <section id="tab-wallets" class="tab-content">
+            <button class="btn-primary w-100" id="btn-add-wallet" style="margin-bottom: 20px;">
+                <i class="fas fa-plus"></i> Thêm Nguồn Tiền
+            </button>
+            
+            <div class="wallet-list">
+                <!-- Ví dụ Nguồn tiền -->
+                <div class="wallet-item">
+                    <div class="wallet-icon cash"><i class="fas fa-money-bill-wave"></i></div>
+                    <div class="wallet-info">
+                        <h4>Tiền mặt</h4>
+                        <p>Ví chính</p>
+                    </div>
+                    <div class="wallet-balance">2.500.000đ</div>
+                    <div class="wallet-actions">
+                        <i class="fas fa-edit text-blue"></i>
+                        <i class="fas fa-trash text-red"></i>
+                    </div>
+                </div>
+                <div class="wallet-item">
+                    <div class="wallet-icon bank"><i class="fas fa-university"></i></div>
+                    <div class="wallet-info">
+                        <h4>Vietcombank</h4>
+                        <p>Tài khoản thanh toán</p>
+                    </div>
+                    <div class="wallet-balance">15.000.000đ</div>
+                    <div class="wallet-actions">
+                        <i class="fas fa-edit text-blue"></i>
+                        <i class="fas fa-trash text-red"></i>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: GIAO DỊCH (THU) -->
+        <section id="tab-income" class="tab-content">
+            <!-- Tương tự Tab 1 nhưng màu xanh và ghi có -->
+            <div class="wallet-summary-scroll">
+                <div class="summary-card total-income">
+                    <p>Tổng thu tháng này</p>
+                    <h4>+25.000.000đ</h4>
+                </div>
+            </div>
+
+            <h3 class="section-title">Lịch sử giao dịch (Thu)</h3>
+            <div class="transaction-list" id="income-list">
+                <div class="tx-item income">
+                    <div class="tx-icon"><i class="fas fa-hand-holding-usd"></i></div>
+                    <div class="tx-info">
+                        <h4>Lương tháng 10</h4>
+                        <p>Vietcombank • 10:00 05/10</p>
+                    </div>
+                    <div class="tx-amount">+25.000.000đ</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: ĐIỀU CHUYỂN -->
+        <section id="tab-transfer" class="tab-content">
+            <div class="transfer-box">
+                <div class="form-group">
+                    <label>Từ nguồn tiền</label>
+                    <select class="form-control">
+                        <option>Vietcombank (15.000.000đ)</option>
+                        <option>Tiền mặt (2.500.000đ)</option>
+                    </select>
+                </div>
+                <div class="form-icon-center"><i class="fas fa-arrow-down"></i></div>
+                <div class="form-group">
+                    <label>Đến nguồn tiền</label>
+                    <select class="form-control">
+                        <option>Tiền mặt</option>
+                        <option>Tài khoản tiết kiệm</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Số tiền chuyển</label>
+                    <input type="number" class="form-control amount-input" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label>Nội dung (Không bắt buộc)</label>
+                    <input type="text" class="form-control" placeholder="Rút tiền mặt tiêu xài">
+                </div>
+                <button class="btn-primary w-100" style="margin-top: 15px;">Thực hiện điều chuyển</button>
+            </div>
+        </section>
+
+        <!-- TAB 5: TÀI KHOẢN (CÀI ĐẶT) -->
+        <section id="tab-profile" class="tab-content">
+            <div class="profile-header">
+                <img src="https://via.placeholder.com/60" alt="Avatar" id="profile-avatar" class="avatar-md">
+                <div>
+                    <h3 id="profile-name">Tên User</h3>
+                    <p id="profile-email">email@gmail.com</p>
+                </div>
+            </div>
+
+            <ul class="settings-list">
+                <li><i class="fas fa-info-circle"></i> Thông tin tài khoản</li>
+                <li><i class="fas fa-key"></i> Đổi mật khẩu</li>
+                <li><i class="fas fa-th"></i> Đổi Passcode</li>
+                <li>
+                    <i class="fas fa-fingerprint"></i> Sinh trắc học
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-bio" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </li>
+                <li><i class="fas fa-file-excel"></i> Xuất báo cáo thu chi chi tiết</li>
+                <li><i class="fas fa-history"></i> Xuất nhật ký người dùng</li>
+                <li class="danger"><i class="fas fa-trash-alt"></i> Xóa tài khoản</li>
+                <li class="danger" id="btn-logout"><i class="fas fa-sign-out-alt"></i> Đăng xuất</li>
+            </ul>
+        </section>
+
+    </main>
+
+
+    <!-- ========================================== -->
+    <!-- BOTTOM NAVIGATION (5 TABS) -->
+    <!-- ========================================== -->
+    <nav id="bottom-nav">
+        <div class="nav-item active" data-target="tab-expense" data-title="Giao dịch (Chi)">
+            <i class="fas fa-arrow-circle-up"></i>
+            <span>Chi</span>
+        </div>
+        <div class="nav-item" data-target="tab-wallets" data-title="Nguồn tiền">
+            <i class="fas fa-wallet"></i>
+            <span>Ví tiền</span>
+        </div>
+        <div class="nav-item" data-target="tab-income" data-title="Giao dịch (Thu)">
+            <i class="fas fa-arrow-circle-down"></i>
+            <span>Thu</span>
+        </div>
+        <div class="nav-item" data-target="tab-transfer" data-title="Điều chuyển">
+            <i class="fas fa-exchange-alt"></i>
+            <span>Chuyển</span>
+        </div>
+        <div class="nav-item" data-target="tab-profile" data-title="Tài khoản">
+            <i class="fas fa-user-cog"></i>
+            <span>Cài đặt</span>
+        </div>
+    </nav>
+
+
+    <!-- ========================================== -->
+    <!-- POPUP MODALS -->
+    <!-- ========================================== -->
+
+    <!-- Popup Thêm Giao Dịch (Dùng chung cho Thu/Chi) -->
+    <div id="modal-add-transaction" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2 id="modal-tx-title">Thêm Giao Dịch</h2>
+            <div class="modal-body">
+                <!-- Ô nhập số tiền to nhất -->
+                <input type="number" placeholder="0" class="input-amount-large" id="tx-amount">
+                
+                <div class="form-group">
+                    <label>Phân loại (Tag)</label>
+                    <select class="form-control" id="tx-tag">
+                        <option>Ăn uống</option>
+                        <option>Mua sắm</option>
+                        <option>Đi lại</option>
+                        <option>Khác</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Nguồn tiền</label>
+                    <select class="form-control" id="tx-wallet">
+                        <option>Tiền mặt</option>
+                        <option>Vietcombank</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Ghi chú</label>
+                    <input type="text" class="form-control" id="tx-note" placeholder="Nhập ghi chú...">
+                </div>
+                
+                <button class="btn-primary w-100 mt-3" id="btn-save-tx">Thêm giao dịch</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Popup Thêm Nguồn Tiền -->
+    <div id="modal-add-wallet" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Thêm Nguồn Tiền</h2>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Loại nguồn tiền</label>
+                    <select class="form-control" id="wallet-type">
+                        <option value="cash">Tiền mặt</option>
+                        <option value="bank">Tài khoản Ngân hàng</option>
+                        <option value="saving">Tài khoản Tiết kiệm</option>
+                    </select>
+                </div>
+                
+                <!-- Ẩn nếu chọn Tiền mặt -->
+                <div class="form-group" id="bank-select-group" style="display: none;">
+                    <label>Chọn Ngân hàng</label>
+                    <select class="form-control" id="wallet-bank-name">
+                        <option>Vietcombank</option>
+                        <option>Techcombank</option>
+                        <option>MB Bank</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Số tiền ban đầu</label>
+                    <input type="number" class="form-control" placeholder="0" id="wallet-amount">
+                </div>
+
+                <button class="btn-primary w-100 mt-3" id="btn-save-wallet">Lưu Nguồn Tiền</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="auth.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

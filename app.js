@@ -1,325 +1,165 @@
-// app.js
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { auth, db, provider } from './config.js'; 
-
-const allowedTeacherEmails = ['nguyentinh52009@gmail.com', 'nguyentinh011009@gmail.com', 'tomizy09icloud@gmail.com'];
-const pageType = document.body.getAttribute('data-page');
-
-let allExams = []; 
-
-// ==========================================
-// THUẬT TOÁN PARSER V2 (THÔNG MINH HƠN, TỰ LÀM SẠCH TEXT)
-// ==========================================
-function parseExamText(rawText, type) {
-    let questions = [];
+document.addEventListener("DOMContentLoaded", () => {
     
-    // Bước 1: Thêm dấu \n vào đầu để đảm bảo Regex hoạt động đúng với câu đầu tiên
-    let text = "\n" + rawText.trim();
+    // ==========================================
+    // 1. LẤY CÁC PHẦN TỬ DOM (DOM ELEMENTS)
+    // ==========================================
     
-    // Bước 2: Cắt khối câu hỏi. Hỗ trợ "Câu 1:", "Câu 1.", "Question 1:", "Question 1."
-    let blocks = text.split(/\n\s*(?:Câu|Question)\s*\d+[\.\:]?\s*/i).filter(b => b.trim().length > 0);
+    // Header & Nav
+    const header = document.getElementById("main-header");
+    const bottomNav = document.getElementById("bottom-nav");
+    const headerTitle = document.getElementById("header-title");
+    const headerActions = document.getElementById("header-actions");
+    
+    // Tabs
+    const navItems = document.querySelectorAll(".nav-item");
+    const tabContents = document.querySelectorAll(".tab-content");
+    
+    // Nút chức năng Header
+    const btnSearch = document.getElementById("btn-search");
+    const btnAddTransaction = document.getElementById("btn-add-transaction");
+    const searchFilterBar = document.getElementById("search-filter-bar");
+    
+    // Modals (Popups)
+    const modalAddTx = document.getElementById("modal-add-transaction");
+    const modalAddWallet = document.getElementById("modal-add-wallet");
+    const btnAddWallet = document.getElementById("btn-add-wallet");
+    const closeButtons = document.querySelectorAll(".close-modal");
 
-    blocks.forEach((block, index) => {
-        let qObj = { id: index + 1, content: "", type: type, options: [], correctAnswer: [] };
+    // Biến trạng thái tab hiện tại
+    let currentTab = "tab-expense";
 
-        if (type === 'tn' || type === 'ds') {
-            // Bước 3: Cắt ranh giới giữa Nội dung câu hỏi và các đáp án A, B, C, D
-            // Dùng Lookahead (?=...) để tìm vị trí của "A.", "*A.", "A)", "*A)"...
-            let parts = block.split(/(?=\s*\*?[A-D][\.\)]\s)/i);
-            
-            // Phần đầu tiên là nội dung câu hỏi tinh khiết
-            qObj.content = parts[0].trim();
 
-            // Các phần tiếp theo là Đáp án
-            for (let i = 1; i < parts.length; i++) {
-                let optText = parts[i].trim();
-                let isCorrect = optText.startsWith('*');
-                
-                if (isCorrect) {
-                    optText = optText.substring(1).trim(); // Cắt bỏ dấu *
-                }
-
-                let letter = optText.charAt(0).toUpperCase();
-                if (isCorrect) qObj.correctAnswer.push(letter);
-
-                // LÀM SẠCH: Cắt bỏ chữ "A.", "B.", "A)", "B)" ở đầu đáp án để tránh bị lặp (A. A.)
-                optText = optText.replace(/^[A-D][\.\)]\s*/i, '').trim();
-                
-                qObj.options.push(optText);
-            }
-        } 
-        else if (type === 'tn_ngan') {
-            let match = block.match(/\[(.*?)\]/);
-            qObj.content = block.replace(/\[.*?\]/, '').trim();
-            qObj.correctAnswer = match ? match[1].trim() : "";
-        } 
-        else if (type === 'tl') {
-            qObj.content = block.trim();
-        }
+    // ==========================================
+    // 2. LOGIC ẨN/HIỆN HEADER & BOTTOM NAV KHI CUỘN
+    // ==========================================
+    let lastScrollTop = 0;
+    
+    window.addEventListener("scroll", () => {
+        let scrollTop = window.pageYOffset || document.documentElement.scrollTop;
         
-        questions.push(qObj);
-    });
-    return questions;
-}
-
-// ==========================================
-// CÁC HÀM TẢI DỮ LIỆU
-// ==========================================
-function loadExamsRealtime() {
-    const selectSetting = document.getElementById('selectExamSetting');
-    const selectManage = document.getElementById('selectExamManage');
-    
-    if(!selectSetting || !selectManage) return;
-
-    selectSetting.innerHTML = '<option value="">Đang kết nối tới máy chủ...</option>';
-
-    onSnapshot(collection(db, "exams"), (snapshot) => {
-        selectSetting.innerHTML = '<option value="">-- Chọn đề thi --</option>';
-        selectManage.innerHTML = '<option value="">-- Chọn đề thi --</option>';
-        allExams = []; 
-
-        if (snapshot.empty) {
-            selectSetting.innerHTML = '<option value="">Chưa có đề thi nào trong CSDL (Hãy tạo đề)</option>';
-            return;
+        // Nếu cuộn xuống và khoảng cách cuộn > 50px (tránh giật khi ở sát top)
+        if (scrollTop > lastScrollTop && scrollTop > 50) {
+            header.classList.add("hidden");
+            bottomNav.classList.add("hidden");
+        } else {
+            // Cuộn lên
+            header.classList.remove("hidden");
+            bottomNav.classList.remove("hidden");
         }
-
-        snapshot.forEach((doc) => {
-            let data = doc.data();
-            allExams.push({ id: doc.id, ...data }); 
-            let examName = data.name || "Đề không tên";
-            let optionHTML = `<option value="${doc.id}">[Khối ${data.grade}] ${examName} - ${data.subject}</option>`;
-            
-            selectSetting.innerHTML += optionHTML;
-            selectManage.innerHTML += optionHTML;
-        });
-    }, (error) => {
-        console.error("Firebase Error: ", error);
-        selectSetting.innerHTML = '<option value="">LỖI: KHÔNG CÓ QUYỀN ĐỌC DỮ LIỆU!</option>';
+        lastScrollTop = scrollTop;
     });
-}
 
-function loadStudentsRealtime() {
-    const tbody = document.getElementById('studentListTable');
-    if(!tbody) return;
 
-    onSnapshot(collection(db, "students"), (snapshot) => {
-        tbody.innerHTML = ""; 
-        snapshot.forEach((doc) => {
-            let data = doc.data();
-            tbody.innerHTML += `
-                <tr style="border-bottom: 1px solid #ddd;">
-                    <td style="padding: 10px;">${data.email}</td>
-                    <td style="padding: 10px;">${data.name}</td>
-                    <td style="padding: 10px;">${data.class}</td>
-                    <td style="padding: 10px;">${data.phone}</td>
-                </tr>
-            `;
-        });
-    }, (error) => {
-        tbody.innerHTML = `<tr><td colspan="4" style="color:red; text-align:center;">Lỗi không thể tải Học sinh: ${error.message}</td></tr>`;
-    });
-}
+    // ==========================================
+    // 3. LOGIC CHUYỂN TAB (BOTTOM NAVIGATION)
+    // ==========================================
+    navItems.forEach(item => {
+        item.addEventListener("click", () => {
+            // 1. Xóa trạng thái active của tất cả
+            navItems.forEach(nav => nav.classList.remove("active"));
+            tabContents.forEach(tab => tab.classList.remove("active"));
 
-// ==========================================
-// ĐĂNG NHẬP (AUTH)
-// ==========================================
-const btnLogin = document.getElementById('btnLogin');
-const btnLogout = document.getElementById('btnLogout'); 
-const btnSidebarLogout = document.getElementById('btnSidebarLogout'); 
+            // 2. Kích hoạt tab được bấm
+            item.classList.add("active");
+            currentTab = item.getAttribute("data-target");
+            document.getElementById(currentTab).classList.add("active");
 
-if (btnLogin) btnLogin.addEventListener('click', () => signInWithPopup(auth, provider));
-if (btnLogout) btnLogout.addEventListener('click', () => signOut(auth));
-if (btnSidebarLogout) btnSidebarLogout.addEventListener('click', () => signOut(auth));
+            // 3. Đổi tiêu đề Header
+            headerTitle.textContent = item.getAttribute("data-title");
 
-onAuthStateChanged(auth, (user) => {
-    const loginSection = document.getElementById('login-section');
-    const appSection = document.getElementById('app-section');
-
-    if (user) {
-        if (pageType === 'teacher') {
-            if (allowedTeacherEmails.includes(user.email)) {
-                if (loginSection) loginSection.classList.add('hidden');
-                if (appSection) appSection.classList.remove('hidden');
-                document.getElementById('userEmail').innerText = "Giáo viên: " + user.email;
+            // 4. Logic hiển thị nút (+) và Kính lúp trên Header
+            // Chỉ hiển thị ở Tab Chi (tab-expense) hoặc Tab Thu (tab-income)
+            if (currentTab === "tab-expense" || currentTab === "tab-income") {
+                headerActions.style.display = "block";
                 
-                loadStudentsRealtime(); 
-                loadExamsRealtime(); 
+                // Nếu chuyển qua tab Thu, ẩn thanh search của tab Chi (nếu đang mở)
+                if (currentTab === "tab-income") {
+                    searchFilterBar.classList.add("hidden");
+                }
             } else {
-                alert("Bạn không có quyền truy cập trang Giáo viên!");
-                signOut(auth);
+                // Các tab khác thì ẩn các nút này đi
+                headerActions.style.display = "none";
+                searchFilterBar.classList.add("hidden");
             }
-        } 
-        else if (pageType === 'student') {
-            if (loginSection) loginSection.classList.add('hidden');
-            if (appSection) appSection.classList.remove('hidden');
-            document.getElementById('studentName').innerText = "Xin chào, " + user.displayName;
-        }
-    } else {
-        if (loginSection) loginSection.classList.remove('hidden');
-        if (appSection) appSection.classList.add('hidden');
-    }
-});
-
-// ==========================================
-// CHỨC NĂNG CHÍNH (TAB GIÁO VIÊN)
-// ==========================================
-if (pageType === 'teacher') {
-
-    // CHUYỂN TAB
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            if(e.target.id === 'btnSidebarLogout') return;
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            e.target.classList.add('active');
             
-            const targetId = e.target.getAttribute('data-target');
-            if(targetId) document.getElementById(targetId).classList.add('active');
+            // 5. Cuộn lên đầu trang mượt mà
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         });
     });
 
-    // MÔN HỌC (TAB 1)
-    const subjectSelect = document.getElementById('subject');
-    if (subjectSelect) {
-        subjectSelect.addEventListener('change', (e) => {
-            document.getElementById('otherSubject').classList.toggle('hidden', e.target.value === 'Tiếng Anh');
+
+    // ==========================================
+    // 4. LOGIC MỞ/ĐÓNG THANH TÌM KIẾM
+    // ==========================================
+    btnSearch.addEventListener("click", () => {
+        // Chỉ cho phép mở search ở tab Giao dịch
+        if (currentTab === "tab-expense" || currentTab === "tab-income") {
+            searchFilterBar.classList.toggle("hidden");
+        }
+    });
+
+
+    // ==========================================
+    // 5. LOGIC MODALS (POPUP THÊM GIAO DỊCH & NGUỒN TIỀN)
+    // ==========================================
+    
+    // Mở Modal Thêm Giao Dịch
+    btnAddTransaction.addEventListener("click", () => {
+        const modalTitle = document.getElementById("modal-tx-title");
+        const amountInput = document.getElementById("tx-amount");
+
+        // UI linh động: Đổi màu và tiêu đề tùy theo đang ở Tab Thu hay Chi
+        if (currentTab === "tab-income") {
+            modalTitle.textContent = "Thêm Thu Nhập";
+            amountInput.style.color = "#00B894"; // Xanh lá
+            amountInput.style.borderColor = "#00B894";
+        } else {
+            modalTitle.textContent = "Thêm Giao Dịch Chi";
+            amountInput.style.color = "#FF416C"; // Đỏ
+            amountInput.style.borderColor = "#FF416C";
+        }
+
+        modalAddTx.classList.add("active");
+    });
+
+    // Mở Modal Thêm Nguồn Tiền (Ở Tab 2)
+    if(btnAddWallet) {
+        btnAddWallet.addEventListener("click", () => {
+            modalAddWallet.classList.add("active");
         });
     }
 
-    // THÊM PHẦN (TAB 1)
-    let sectionCount = 0;
-    const btnAddSection = document.getElementById('btnAddSection');
-    if (btnAddSection) {
-        btnAddSection.addEventListener('click', () => {
-            sectionCount++;
-            const isEng = document.getElementById('subject').value === 'Tiếng Anh';
-            const options = isEng 
-                ? `<option value="tn">Trắc nghiệm</option><option value="tl">Writing/Rewrite (Tự luận)</option>`
-                : `<option value="tn">Trắc nghiệm</option><option value="ds">Đúng - Sai</option><option value="tn_ngan">Trả lời ngắn (4 ký tự)</option><option value="tl">Tự luận</option>`;
-            
-            const html = `
-                <div class="card section-item" style="border-left: 4px solid var(--primary-color);">
-                    <h4>Phần ${sectionCount}</h4>
-                    <input type="text" class="form-control section-name" placeholder="Tên phần (VD: Phần I)" style="margin: 10px 0;">
-                    <select class="form-control section-type" style="margin-bottom: 10px;">${options}</select>
-                    <textarea class="form-control raw-text" placeholder="Dán đề thô vào đây... (Chú ý: Đáp án đúng có dấu * trước chữ cái)"></textarea>
-                </div>
-            `;
-            document.getElementById('sections-container').insertAdjacentHTML('beforeend', html);
+    // Đóng Modal khi bấm nút (X)
+    closeButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            modalAddTx.classList.remove("active");
+            modalAddWallet.classList.remove("active");
         });
-    }
+    });
 
-    // LƯU ĐỀ THI
-    const btnSaveExam = document.getElementById('btnSaveExam');
-    if (btnSaveExam) {
-        btnSaveExam.addEventListener('click', async () => {
-            const subject = document.getElementById('subject').value === 'Khác' 
-                            ? document.getElementById('otherSubject').value : 'Tiếng Anh';
-            const examName = document.getElementById('examName').value;
-            if(!examName) return alert("Vui lòng nhập tên đề thi!");
+    // Đóng Modal khi click ra ngoài vùng nội dung
+    window.addEventListener("click", (e) => {
+        if (e.target === modalAddTx) modalAddTx.classList.remove("active");
+        if (e.target === modalAddWallet) modalAddWallet.classList.remove("active");
+    });
 
-            const sectionsData = Array.from(document.querySelectorAll('.section-item')).map(item => {
-                const raw = item.querySelector('.raw-text').value;
-                const type = item.querySelector('.section-type').value;
-                return {
-                    name: item.querySelector('.section-name').value,
-                    type: type,
-                    questions: parseExamText(raw, type)
-                };
-            });
 
-            const examData = {
-                subject: subject,
-                grade: document.getElementById('grade').value,
-                name: examName,
-                type: document.getElementById('examType').value,
-                createdAt: new Date().toISOString(),
-                sections: sectionsData
-            };
+    // ==========================================
+    // 6. LOGIC FORM THÊM NGUỒN TIỀN (DYNAMIC UI)
+    // ==========================================
+    const walletTypeSelect = document.getElementById("wallet-type");
+    const bankSelectGroup = document.getElementById("bank-select-group");
 
-            btnSaveExam.innerText = "Đang lưu...";
-            try {
-                await addDoc(collection(db, "exams"), examData);
-                alert("Lưu đề thành công! Hãy sang Tab Cài đặt để quản lý.");
-                document.getElementById('examName').value = "";
-                document.getElementById('sections-container').innerHTML = "";
-                sectionCount = 0;
-            } catch (error) {
-                alert("LỖI KHÔNG THỂ LƯU ĐỀ: " + error.message);
-            } finally {
-                btnSaveExam.innerText = "Nhận diện & Lưu Đề";
+    if (walletTypeSelect && bankSelectGroup) {
+        walletTypeSelect.addEventListener("change", (e) => {
+            // Nếu chọn Ngân hàng hoặc Tiết kiệm -> Hiện ô chọn Ngân hàng
+            if (e.target.value === "bank" || e.target.value === "saving") {
+                bankSelectGroup.style.display = "block";
+            } else {
+                // Nếu chọn Tiền mặt -> Ẩn ô chọn Ngân hàng
+                bankSelectGroup.style.display = "none";
             }
         });
     }
 
-    // XUẤT PDF (TAB 2)
-    const btnExportPDF = document.getElementById('btnExportPDF');
-    if (btnExportPDF) {
-        btnExportPDF.addEventListener('click', () => {
-            const examId = document.getElementById('selectExamSetting').value;
-            if (!examId) return alert("Vui lòng chọn 1 đề thi ở danh sách bên trên để xuất PDF!");
-
-            const exam = allExams.find(e => e.id === examId);
-            if(!exam) return alert("Không tìm thấy dữ liệu đề thi!");
-
-            let htmlContent = `
-                <div style="padding: 20px; font-family: 'Times New Roman', serif; color: black; line-height: 1.5;">
-                    <div style="text-align: center; margin-bottom: 20px;">
-                        <h2 style="margin: 0; font-size: 20px;">HỆ THỐNG ÔN TẬP FUEDU</h2>
-                        <h1 style="margin: 5px 0; font-size: 22px; text-transform: uppercase;">${exam.name}</h1>
-                        <p style="margin: 0; font-style: italic;">Môn: ${exam.subject} - Khối: ${exam.grade}</p>
-                    </div>
-                    <hr style="border: 1px solid black; margin-bottom: 20px;">
-            `;
-
-            exam.sections.forEach(sec => {
-                htmlContent += `<h3 style="font-size: 18px; margin-top: 15px;">${sec.name}</h3>`;
-                sec.questions.forEach(q => {
-                    htmlContent += `<div style="margin-bottom: 10px;"><span style="font-weight: bold;">Câu ${q.id}:</span> ${q.content}<div style="margin-top: 5px; padding-left: 15px;">`;
-                    if (q.options && q.options.length > 0) {
-                        q.options.forEach((opt, idx) => {
-                            htmlContent += `<div style="display: inline-block; width: 48%; margin-bottom: 5px; vertical-align: top;"><b>${String.fromCharCode(65 + idx)}.</b> ${opt}</div>`;
-                        });
-                    }
-                    htmlContent += `</div></div>`;
-                });
-            });
-
-            htmlContent += `</div>`;
-
-            let opt = {
-                margin: 10, filename: `${exam.name}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2 },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
-            
-            btnExportPDF.innerText = "Đang tạo PDF...";
-            html2pdf().set(opt).from(htmlContent).save().then(() => btnExportPDF.innerText = "Xuất PDF");
-        });
-    }
-
-    // THÊM HỌC SINH (TAB 4)
-    const btnAddStudent = document.getElementById('btnAddStudent');
-    if (btnAddStudent) {
-        btnAddStudent.addEventListener('click', async () => {
-            const email = document.getElementById('stuEmail').value.trim();
-            if(!email) return alert("Vui lòng nhập Email học sinh!");
-
-            const studentData = {
-                email: email, name: document.getElementById('stuName').value,
-                class: document.getElementById('stuClass').value, phone: document.getElementById('stuPhone').value
-            };
-
-            try {
-                await setDoc(doc(db, "students", email), studentData);
-                alert("Lưu thông tin học sinh thành công!");
-                document.getElementById('stuEmail').value = ""; document.getElementById('stuName').value = "";
-            } catch (e) {
-                alert("Lỗi lưu học sinh: " + e.message);
-            }
-        });
-    }
-}
+});

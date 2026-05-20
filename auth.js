@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyADFk75bvScT28rj8AukdvFeY0UhcgPVtM",
@@ -149,6 +149,12 @@ async function finishSetup(useBio) {
             useBiometrics: useBio,
             createdAt: new Date()
         });
+      // MỚI: Thêm các Tag mặc định cho người dùng mới
+        const defaultTags = ["Ăn uống", "Đi lại", "Mua sắm", "Hóa đơn", "Lương", "Thưởng"];
+        for (const tagName of defaultTags) {
+            const tagRef = collection(db, "users", currentUser.uid, "tags");
+            await addDoc(tagRef, { name: tagName });
+        }
         enterApp();
     } catch (error) {
         console.error("Lỗi lưu DB:", error);
